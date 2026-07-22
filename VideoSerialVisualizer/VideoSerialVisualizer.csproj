@@ -1,0 +1,78 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>VideoSerialVisualizer</AssemblyName>
+    <RootNamespace>VideoSerialVisualizer</RootNamespace>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <!-- Se usa el Main de Program.cs en lugar del que WPF genera desde App.xaml, para poder
+         ejecutar Velopack como primera instruccion del proceso (ver Program.cs). -->
+    <StartupObject>VideoSerialVisualizer.Program</StartupObject>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+  </PropertyGroup>
+
+  <!-- Al desactivar EnableDefaultApplicationDefinition, el SDK pasa App.xaml a Page automaticamente:
+       asi no genera su propio Main (que chocaria con el de Program.cs) pero sigue generando
+       InitializeComponent(). No hace falta incluirlo a mano. -->
+
+  <!-- Version e identidad del producto. Velopack compara esta version para decidir si hay
+       actualizacion, asi que hay que subirla en cada release publicada (SemVer). -->
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>Video Serial Visualizer</Product>
+    <Description>Reproductor de series de video basado en VLC que conserva tu progreso exacto en la linea de tiempo entre sesiones, y reune carpetas enteras de videos o cursos en un solo lugar organizado.</Description>
+    <Authors>David Nieves</Authors>
+    <Company>David Nieves</Company>
+    <Copyright>Copyright © 2026 David Nieves</Copyright>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <!-- La app es x64-only: sin esto el paquete de LibVLC copia TAMBIEN el runtime x86
+       (~96 MB muertos, un 25% de la descarga). -->
+  <PropertyGroup>
+    <VlcWindowsX64Enabled>true</VlcWindowsX64Enabled>
+    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
+  </PropertyGroup>
+
+  <!-- WinForms se usa solo para hospedar la superficie de video (WindowsFormsHost + Panel).
+       Se quitan sus using implicitos para que no choquen con los tipos WPF (UserControl,
+       Application, KeyEventArgs, RadioButton, etc.); se referencian con nombre calificado. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="LibVLCSharp" Version="3.9.0" />
+    <PackageReference Include="LibVLCSharp.WPF" Version="3.9.0" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\AppIcon.ico" />
+  </ItemGroup>
+
+  <!-- La GPL/LGPL exigen que la licencia y la atribucion acompañen a la copia distribuida,
+       no que esten solo en el repositorio: por eso se copian junto al ejecutable. -->
+  <ItemGroup>
+    <Content Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

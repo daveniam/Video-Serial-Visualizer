@@ -1,0 +1,42 @@
+<Window x:Class="VideoSerialVisualizer.Views.RenameCategoryDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Ajustar categoría" Height="180" Width="380"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BgPrimaryBrush}"
+        ShowInTaskbar="False">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Nombre de la categoría" Foreground="{StaticResource TextPrimaryBrush}"
+                   FontWeight="SemiBold" Margin="0,0,0,10" />
+
+        <Border Grid.Row="1" Background="{StaticResource BgSurfaceBrush}" CornerRadius="8"
+                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
+            <TextBox x:Name="NameTextBox" Background="Transparent" BorderThickness="0"
+                     Foreground="{StaticResource TextPrimaryBrush}" CaretBrush="{StaticResource TextPrimaryBrush}"
+                     Padding="10,8" FontSize="14" />
+        </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Style="{StaticResource PlainButtonStyle}" Click="Cancel_Click" Margin="0,0,10,0">
+                <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="16,8">
+                    <TextBlock Text="Cancelar" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" />
+                </Border>
+            </Button>
+            <Button Style="{StaticResource PlainButtonStyle}" Click="Save_Click" IsDefault="True">
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="16,8">
+                    <TextBlock Text="Guardar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                </Border>
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

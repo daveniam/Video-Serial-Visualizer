@@ -1,0 +1,111 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using LibVLCSharp.Shared;
+using Microsoft.Data.Sqlite;
+using VideoSerialVisualizer.Data;
+using VideoSerialVisualizer.Models;
+using VideoSerialVisualizer.Services;
+
+namespace VideoSerialVisualizer.ViewModels;
+
+public partial class MainViewModel : ObservableObject, IDisposable
+{
+    private LibVLC? _libVlc;
+
+    [ObservableProperty]
+    private object? currentViewModel;
+
+    [ObservableProperty]
+    private bool isLoading = true;
+
+    [ObservableProperty]
+    private string loadingMessage = "Iniciando...";
+
+    public FoldersViewModel? FoldersViewModel { get; private set; }
+    public LibraryViewModel? LibraryViewModel { get; private set; }
+    public PlayerViewModel? PlayerViewModel { get; private set; }
+
+    public async Task InitializeAsync()
+    {
+        LoadingMessage = "Iniciando reproductor...";
+        await Task.Run(() =>
+        {
+            Core.Initialize();
+            // Se desactiva la decodificacion por hardware: es la causa mas comun de crashes
+            // nativos de LibVLC con ciertos drivers de GPU/codecs (no recuperable con try/catch).
+            _libVlc = new LibVLC("--avcodec-hw=none");
+        });
+
+        LoadingMessage = "Preparando base de datos...";
+        await using (var db = new AppDbContext())
+        {
+            try
+            {
+                await AppDbContext.EnsureSchemaUpToDateAsync(db);
+            }
+            catch (SqliteException)
+            {
+                // Otra instancia creo el esquema al mismo tiempo; el resultado final es el mismo.
+            }
+        }
+
+        var thumbnailService = new ThumbnailService(_libVlc!);
+        var scannerService = new FolderScannerService(_libVlc!, thumbnailService);
+        var progressTracker = new ProgressTrackerService();
+
+        FoldersViewModel = new FoldersViewModel(scannerService, OpenFolder);
+        LibraryViewModel = new LibraryViewModel(OpenPlayer, BackToFolders);
+        PlayerViewModel = new PlayerViewModel(_libVlc!, progressTracker, BackToLibrary);
+
+        OnPropertyChanged(nameof(FoldersViewModel));
+        OnPropertyChanged(nameof(LibraryViewModel));
+        OnPropertyChanged(nameof(PlayerViewModel));
+
+        LoadingMessage = "Cargando biblioteca...";
+        await FoldersViewModel.InitializeAsync();
+
+        CurrentViewModel = FoldersViewModel;
+        IsLoading = false;
+    }
+
+    private async void OpenFolder(string folderPath)
+    {
+        var folderName = Path.GetFileName(folderPath.TrimEnd('\\', '/'));
+        if (string.IsNullOrEmpty(folderName))
+            folderName = folderPath;
+
+        LibraryViewModel!.SetScope(folderPath, folderName);
+        CurrentViewModel = LibraryViewModel;
+        await LibraryViewModel.RefreshAsync();
+    }
+
+    private async void BackToFolders()
+    {
+        CurrentViewModel = FoldersViewModel;
+        await FoldersViewModel!.RefreshAsync();
+    }
+
+    private async void OpenPlayer(Video video)
+    {
+        // Mostrar primero el reproductor para que PlayerView se cargue y registre su ventana de
+        // video (Hwnd). Se espera a la prioridad Loaded del Dispatcher para garantizar que ese
+        // registro ya ocurrio ANTES de reproducir; de lo contrario LibVLC abre su propia ventana.
+        CurrentViewModel = PlayerViewModel;
+        await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+        await PlayerViewModel!.LoadVideoAsync(video, LibraryViewModel!.GetPlaylist());
+    }
+
+    private async void BackToLibrary()
+    {
+        CurrentViewModel = LibraryViewModel;
+        await LibraryViewModel!.RefreshAsync();
+    }
+
+    public void Dispose()
+    {
+        PlayerViewModel?.SaveAndDispose();
+        _libVlc?.Dispose();
+    }
+}

@@ -1,0 +1,146 @@
+<Window x:Class="VideoSerialVisualizer.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
+        xmlns:models="clr-namespace:VideoSerialVisualizer.Models"
+        mc:Ignorable="d"
+        Title="Configuración" Height="700" Width="540"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgPrimaryBrush}"
+        d:DataContext="{d:DesignInstance Type=vm:FoldersViewModel}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Configuración" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                   Margin="0,0,0,20" />
+
+        <!-- Categorías personalizadas -->
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <TextBlock Text="Categorías" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <Button HorizontalAlignment="Right" Style="{StaticResource PlainButtonStyle}" Command="{Binding AddCategoryCommand}">
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="12,6">
+                    <TextBlock Text="+ Nueva categoría" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                </Border>
+            </Button>
+        </Grid>
+
+        <TextBlock Grid.Row="2"
+                    Text="Creá categorías para agrupar tus carpetas (por ejemplo: Blender, ZBrush, Programación). Asignalas con clic derecho sobre un grupo en Explorar."
+                    Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,12" />
+
+        <StackPanel Grid.Row="3" Margin="0,0,0,20">
+            <ItemsControl ItemsSource="{Binding Categories}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type models:Category}">
+                        <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="14" Padding="4,4,4,4" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource PlainButtonStyle}" Padding="8,4"
+                                        Command="{Binding DataContext.RenameCategoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}" ToolTip="Renombrar categoría">
+                                    <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Style="{StaticResource PlainButtonStyle}" Margin="2,0,4,0" Padding="6,4"
+                                        Command="{Binding DataContext.DeleteCategoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}" ToolTip="Eliminar categoría">
+                                    <TextBlock Text="&#10005;" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Todavía no creaste ninguna categoría." Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Categories.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+
+        <Border Grid.Row="4" Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,0,0,20" />
+
+        <TextBlock Grid.Row="5" Text="Grupos de carpetas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                   Margin="0,0,0,8" />
+
+        <ScrollViewer Grid.Row="6" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Cada grupo corresponde a una carpeta que agregaste. Podés renombrarlo o quitarlo de Video Serial Visualizer."
+                           Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                <ItemsControl ItemsSource="{Binding FolderCards}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:FolderCardViewModel}">
+                            <Border Margin="0,0,0,10" CornerRadius="8" Background="{StaticResource BgSurfaceBrush}"
+                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" Padding="14,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding FolderPath}">
+                                            <Run Text="{Binding VideoCount, Mode=OneWay}" />
+                                            <Run Text=" video(s) · " />
+                                            <Run Text="{Binding FolderPath, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="1" Style="{StaticResource PlainButtonStyle}" Margin="10,0,0,0"
+                                            Command="{Binding DataContext.RenameFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}">
+                                        <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="12,7">
+                                            <TextBlock Text="Renombrar" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                    </Button>
+
+                                    <Button Grid.Column="2" Style="{StaticResource PlainButtonStyle}" Margin="8,0,0,0"
+                                            Command="{Binding DataContext.DeleteFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}">
+                                        <Border Background="#3A1F24" CornerRadius="6" Padding="12,7">
+                                            <TextBlock Text="Eliminar" Foreground="#FF6B6B" FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Button Grid.Row="7" Style="{StaticResource PlainButtonStyle}" HorizontalAlignment="Right" Margin="0,16,0,0"
+                Click="Close_Click">
+            <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="18,9">
+                <TextBlock Text="Cerrar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+            </Border>
+        </Button>
+    </Grid>
+</Window>

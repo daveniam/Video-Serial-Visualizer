@@ -1,0 +1,215 @@
+<UserControl x:Class="VideoSerialVisualizer.Views.LibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
+             mc:Ignorable="d"
+             Background="{StaticResource BgPrimaryBrush}"
+             d:DataContext="{d:DesignInstance Type=vm:LibraryViewModel}">
+    <Grid Margin="32,28,32,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Encabezado -->
+        <Grid Grid.Row="0" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal">
+                <Button Style="{StaticResource BackButtonStyle}" Command="{Binding BackCommand}" Margin="0,0,14,0"
+                        VerticalAlignment="Center" ToolTip="Volver a Explorar" />
+                <TextBlock Text="{Binding ScopeTitle}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Buscador + toggle grid/lista -->
+        <Grid Grid.Row="1" Margin="0,0,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="{StaticResource BgSurfaceBrush}" CornerRadius="8"
+                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" Height="38">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="&#128269;" Margin="10,0,4,0" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                    <Grid Grid.Column="1">
+                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimaryBrush}"
+                                 CaretBrush="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
+                        <TextBlock Text="Buscar..." Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                   IsHitTestVisible="False"
+                                   Visibility="{Binding SearchText, Converter={StaticResource InverseStringToVisibilityConverter}}" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="2" VerticalAlignment="Center" Width="80" Height="40">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="40" />
+                    <ColumnDefinition Width="40" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0" Style="{StaticResource PlainButtonStyle}" Command="{Binding SetGridViewCommand}"
+                        ToolTip="Vista en cuadricula">
+                    <Canvas Width="40" Height="40">
+                        <Path Data="{StaticResource GridToggleLeftBgGeometry}"
+                              Fill="{Binding IsListView, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=#414249;#1CA1D0}" />
+                        <Path Data="{StaticResource GridViewIconGeometry}" Fill="White" />
+                    </Canvas>
+                </Button>
+
+                <Button Grid.Column="1" Style="{StaticResource PlainButtonStyle}" Command="{Binding SetListViewCommand}"
+                        ToolTip="Vista en lista">
+                    <Canvas Width="40" Height="40">
+                        <Path Data="{StaticResource ListToggleRightBgGeometry}"
+                              Fill="{Binding IsListView, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=#1CA1D0;#414249}" />
+                        <Path Data="{StaticResource ListViewIconGeometry}" Fill="White" />
+                    </Canvas>
+                </Button>
+            </Grid>
+        </Grid>
+
+        <TextBlock Grid.Row="2" Text="Sin videos en esta seccion." Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Videos.Count}" Value="0">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <ScrollViewer Grid.Row="3" Margin="0,16,0,0" VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <!-- Vista en cuadricula -->
+                <ItemsControl ItemsSource="{Binding Videos}" Visibility="{Binding IsListView, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:VideoCardViewModel}">
+                            <Border Width="240" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"
+                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="135" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Button Grid.RowSpan="2" Style="{StaticResource PlainButtonStyle}"
+                                            Command="{Binding DataContext.OpenVideoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+
+                                    <Grid Grid.Row="0" IsHitTestVisible="False">
+                                        <Rectangle Fill="{StaticResource BgSurfaceAltBrush}" />
+                                        <TextBlock Text="&#127916;" FontSize="30" Foreground="{StaticResource TextSecondaryBrush}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill" />
+                                    </Grid>
+
+                                    <StackPanel Grid.Row="1" Margin="12,10,12,12" IsHitTestVisible="False">
+                                        <TextBlock Text="{Binding NombreArchivo}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding NombreArchivo}" />
+                                        <TextBlock Text="{Binding CarpetaOrigen}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding CarpetaOrigen}" Margin="0,2,0,8" />
+
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="10" Padding="8,3">
+                                                <TextBlock Text="{Binding DurationText}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+                                            <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="10" Padding="8,3" Margin="6,0,0,0">
+                                                <TextBlock Text="{Binding ProgressText}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+                                        </StackPanel>
+
+                                        <Grid Height="4" Margin="0,8,0,0" Background="{StaticResource BgSurfaceAltBrush}">
+                                            <Rectangle Height="4" HorizontalAlignment="Left"
+                                                       Fill="{Binding Completado, Converter={StaticResource CompletadoToBrushConverter}}"
+                                                       Width="{Binding ProgressPercent, Converter={StaticResource PercentToWidthConverter}, ConverterParameter=216}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Vista en lista -->
+                <ItemsControl ItemsSource="{Binding Videos}" Visibility="{Binding IsListView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:VideoCardViewModel}">
+                            <Border Margin="0,0,0,10" CornerRadius="8" Background="{StaticResource BgSurfaceBrush}"
+                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="72" />
+                                        <RowDefinition Height="4" />
+                                    </Grid.RowDefinitions>
+
+                                    <Button Grid.RowSpan="2" Style="{StaticResource PlainButtonStyle}"
+                                            Command="{Binding DataContext.OpenVideoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Grid Grid.Column="0" IsHitTestVisible="False">
+                                            <Rectangle Fill="{StaticResource BgSurfaceAltBrush}" />
+                                            <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill" />
+                                        </Grid>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0" IsHitTestVisible="False">
+                                            <TextBlock Text="{Binding NombreArchivo}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding CarpetaOrigen}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0"
+                                                    IsHitTestVisible="False">
+                                            <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="10" Padding="8,3">
+                                                <TextBlock Text="{Binding DurationText}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+                                            <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="10" Padding="8,3" Margin="6,0,0,0">
+                                                <TextBlock Text="{Binding ProgressText}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Barra de progreso: se reparte en dos columnas proporcionales para
+                                         que acompane el ancho variable de la fila (la grilla usa ancho fijo). -->
+                                    <Grid Grid.Row="1" Background="{StaticResource BgSurfaceAltBrush}" IsHitTestVisible="False">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
+                                            <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}, ConverterParameter=Inverse}" />
+                                        </Grid.ColumnDefinitions>
+                                        <Rectangle Grid.Column="0" Fill="{Binding Completado, Converter={StaticResource CompletadoToBrushConverter}}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

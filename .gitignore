@@ -1,0 +1,24 @@
+# === Artefactos de compilacion de .NET ===
+bin/
+obj/
+*.user
+*.suo
+
+# === Salidas de publicacion y empaquetado ===
+# Pesan cientos de MB (LibVLC + runtime self-contained) y se regeneran con build-release.ps1.
+# Las releases se distribuyen adjuntas a los Releases de GitHub, no versionadas en el repo.
+/publish/
+/Releases/
+
+# === Entorno de desarrollo ===
+# Configuracion local de Claude Code: es de tu maquina, no del proyecto.
+.claude/settings.local.json
+.vs/
+.idea/
+*.swp
+*~
+
+# === Sistema operativo ===
+Thumbs.db
+desktop.ini
+.DS_Store

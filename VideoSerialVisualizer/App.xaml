@@ -1,0 +1,306 @@
+<Application x:Class="VideoSerialVisualizer.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:VideoSerialVisualizer"
+             xmlns:conv="clr-namespace:VideoSerialVisualizer.Converters"
+             xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
+             xmlns:views="clr-namespace:VideoSerialVisualizer.Views">
+    <Application.Resources>
+        <ResourceDictionary>
+            <conv:PercentToWidthConverter x:Key="PercentToWidthConverter" />
+            <conv:CompletadoToBrushConverter x:Key="CompletadoToBrushConverter" />
+            <conv:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+            <conv:InverseStringToVisibilityConverter x:Key="InverseStringToVisibilityConverter" />
+            <conv:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+            <conv:BoolToBrushConverter x:Key="BoolToBrushConverter" />
+            <conv:PercentToGridLengthConverter x:Key="PercentToGridLengthConverter" />
+            <conv:PlayPauseIconConverter x:Key="PlayPauseIconConverter" />
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+            <!-- Paleta tema oscuro -->
+            <SolidColorBrush x:Key="BgPrimaryBrush" Color="#0E0E12" />
+            <SolidColorBrush x:Key="BgSurfaceBrush" Color="#1A1A20" />
+            <SolidColorBrush x:Key="BgSurfaceAltBrush" Color="#24242C" />
+            <SolidColorBrush x:Key="BorderSubtleBrush" Color="#2E2E38" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F2F2F5" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#9A9AA5" />
+            <SolidColorBrush x:Key="AccentBrush" Color="#1CA1D0" />
+            <SolidColorBrush x:Key="AccentHoverBrush" Color="#35B5E0" />
+            <SolidColorBrush x:Key="ControlSurfaceBrush" Color="#414249" />
+            <SolidColorBrush x:Key="SeekPlayedBrush" Color="#E4362F" />
+            <SolidColorBrush x:Key="SeekTrackBrush" Color="#4DFFFFFF" />
+
+            <!-- Iconos de vista grilla/lista -->
+            <Geometry x:Key="GridViewIconGeometry">M17.15 19.26H12.15C11.6389 19.2574 11.1495 19.0532 10.7882 18.6918C10.4268 18.3304 10.2226 17.8411 10.22 17.33V12.33C10.2226 11.8189 10.4268 11.3296 10.7882 10.9682C11.1495 10.6068 11.6389 10.4026 12.15 10.4H17.15C17.661 10.4026 18.1504 10.6068 18.5118 10.9682C18.8732 11.3296 19.0773 11.8189 19.08 12.33V17.33C19.0773 17.8411 18.8732 18.3304 18.5118 18.6918C18.1504 19.0532 17.661 19.2574 17.15 19.26V19.26ZM12.15 11.9C12.0367 11.9025 11.9288 11.9487 11.8487 12.0288C11.7686 12.1089 11.7225 12.2168 11.72 12.33V17.33C11.72 17.444 11.7653 17.5534 11.8459 17.634C11.9266 17.7147 12.0359 17.76 12.15 17.76H17.15C17.264 17.76 17.3734 17.7147 17.454 17.634C17.5347 17.5534 17.58 17.444 17.58 17.33V12.33C17.58 12.216 17.5347 12.1066 17.454 12.0259C17.3734 11.9453 17.264 11.9 17.15 11.9H12.15Z M27.8499 19.26H22.8499C22.3389 19.2574 21.8495 19.0532 21.4881 18.6918C21.1267 18.3304 20.9225 17.8411 20.9199 17.33V12.33C20.9225 11.8189 21.1267 11.3296 21.4881 10.9682C21.8495 10.6068 22.3389 10.4026 22.8499 10.4H27.8499C28.361 10.4026 28.8504 10.6068 29.2117 10.9682C29.5731 11.3296 29.7773 11.8189 29.7799 12.33V17.33C29.7773 17.8411 29.5731 18.3304 29.2117 18.6918C28.8504 19.0532 28.361 19.2574 27.8499 19.26V19.26ZM22.8499 11.9C22.7359 11.9 22.6265 11.9453 22.5459 12.0259C22.4652 12.1066 22.4199 12.216 22.4199 12.33V17.33C22.4199 17.444 22.4652 17.5534 22.5459 17.634C22.6265 17.7147 22.7359 17.76 22.8499 17.76H27.8499C27.964 17.76 28.0733 17.7147 28.154 17.634C28.2346 17.5534 28.2799 17.444 28.2799 17.33V12.33C28.2799 12.216 28.2346 12.1066 28.154 12.0259C28.0733 11.9453 27.964 11.9 27.8499 11.9H22.8499Z M17.15 29.6H12.15C11.6389 29.5974 11.1495 29.3932 10.7882 29.0318C10.4268 28.6704 10.2226 28.181 10.22 27.67V22.67C10.2226 22.1589 10.4268 21.6696 10.7882 21.3082C11.1495 20.9468 11.6389 20.7426 12.15 20.74H17.15C17.661 20.7426 18.1504 20.9468 18.5118 21.3082C18.8732 21.6696 19.0773 22.1589 19.08 22.67V27.67C19.0773 28.181 18.8732 28.6704 18.5118 29.0318C18.1504 29.3932 17.661 29.5974 17.15 29.6V29.6ZM12.15 22.24C12.0359 22.24 11.9266 22.2853 11.8459 22.3659C11.7653 22.4466 11.72 22.5559 11.72 22.67V27.67C11.7225 27.7832 11.7686 27.8911 11.8487 27.9712C11.9288 28.0513 12.0367 28.0974 12.15 28.1H17.15C17.264 28.1 17.3734 28.0547 17.454 27.974C17.5347 27.8934 17.58 27.784 17.58 27.67V22.67C17.58 22.5559 17.5347 22.4466 17.454 22.3659C17.3734 22.2853 17.264 22.24 17.15 22.24H12.15Z M27.8499 29.6H22.8499C22.3389 29.5974 21.8495 29.3932 21.4881 29.0318C21.1267 28.6704 20.9225 28.181 20.9199 27.67V22.67C20.9225 22.1589 21.1267 21.6696 21.4881 21.3082C21.8495 20.9468 22.3389 20.7426 22.8499 20.74H27.8499C28.361 20.7426 28.8504 20.9468 29.2117 21.3082C29.5731 21.6696 29.7773 22.1589 29.7799 22.67V27.67C29.7773 28.181 29.5731 28.6704 29.2117 29.0318C28.8504 29.3932 28.361 29.5974 27.8499 29.6V29.6ZM22.8499 22.24C22.7359 22.24 22.6265 22.2853 22.5459 22.3659C22.4652 22.4466 22.4199 22.5559 22.4199 22.67V27.67C22.4199 27.784 22.4652 27.8934 22.5459 27.974C22.6265 28.0547 22.7359 28.1 22.8499 28.1H27.8499C27.964 28.1 28.0733 28.0547 28.154 27.974C28.2346 27.8934 28.2799 27.784 28.2799 27.67V22.67C28.2799 22.5559 28.2346 22.4466 28.154 22.3659C28.0733 22.2853 27.964 22.24 27.8499 22.24H22.8499Z</Geometry>
+            <Geometry x:Key="ListViewIconGeometry">M27.15 19.26H12.15C11.6389 19.2574 11.1495 19.0532 10.7882 18.6918C10.4268 18.3304 10.2226 17.8411 10.22 17.33V12.33C10.2226 11.8189 10.4268 11.3296 10.7882 10.9682C11.1495 10.6068 11.6389 10.4026 12.15 10.4H27.15C27.661 10.4026 28.1504 10.6068 28.5118 10.9682C28.8732 11.3296 29.0773 11.8189 29.08 12.33V17.33C29.0773 17.8411 28.8732 18.3304 28.5118 18.6918C28.1504 19.0532 27.661 19.2574 27.15 19.26ZM12.15 11.9C12.0367 11.9025 11.9288 11.9487 11.8487 12.0288C11.7686 12.1089 11.7225 12.2168 11.72 12.33V17.33C11.72 17.444 11.7653 17.5534 11.8459 17.634C11.9266 17.7147 12.0359 17.76 12.15 17.76H27.15C27.264 17.76 27.3734 17.7147 27.454 17.634C27.5347 17.5534 27.58 17.444 27.58 17.33V12.33C27.58 12.216 27.5347 12.1066 27.454 12.0259C27.3734 11.9453 27.264 11.9 27.15 11.9H12.15Z M27.15 29.6H12.15C11.6389 29.5974 11.1495 29.3932 10.7882 29.0318C10.4268 28.6704 10.2226 28.181 10.22 27.67V22.67C10.2226 22.1589 10.4268 21.6696 10.7882 21.3082C11.1495 20.9468 11.6389 20.7426 12.15 20.74H27.15C27.661 20.7426 28.1504 20.9468 28.5118 21.3082C28.8732 21.6696 29.0773 22.1589 29.08 22.67V27.67C29.0773 28.181 28.8732 28.6704 28.5118 29.0318C28.1504 29.3932 27.661 29.5974 27.15 29.6ZM12.15 22.24C12.0359 22.24 11.9266 22.2853 11.8459 22.3659C11.7653 22.4466 11.72 22.5559 11.72 22.67V27.67C11.7225 27.7832 11.7686 27.8911 11.8487 27.9712C11.9288 28.0513 12.0367 28.0974 12.15 28.1H27.15C27.264 28.1 27.3734 28.0547 27.454 27.974C27.5347 27.8934 27.58 27.784 27.58 27.67V22.67C27.58 22.5559 27.5347 22.4466 27.454 22.3659C27.3734 22.2853 27.264 22.24 27.15 22.24H12.15Z</Geometry>
+
+            <!-- Fondos de la mitad de la pildora del selector grilla/lista (esquinas redondeadas solo del lado externo) -->
+            <Geometry x:Key="GridToggleLeftBgGeometry">M0 8C0 3.58172 3.58172 0 8 0H40V40H8C3.58172 40 0 36.4183 0 32V8Z</Geometry>
+            <Geometry x:Key="ListToggleRightBgGeometry">M0 0H32C36.4183 0 40 3.58172 40 8V32C40 36.4183 36.4183 40 32 40H0V0Z</Geometry>
+
+            <!-- Icono de favorito: corazon contorneado (no favorito) o relleno (favorito) -->
+            <Geometry x:Key="HeartOutlineGeometry">M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z</Geometry>
+            <Geometry x:Key="HeartFilledGeometry">M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z</Geometry>
+
+            <!-- Iconos de saltar al video anterior / siguiente (barra + triangulo, estilo player) -->
+            <Geometry x:Key="SkipPreviousGeometry">M6,6 H8.5 V18 H6 Z M18,6 L9.8,12 L18,18 Z</Geometry>
+            <Geometry x:Key="SkipNextGeometry">M15.5,6 H18 V18 H15.5 Z M6,6 L14.2,12 L6,18 Z</Geometry>
+
+            <!-- Flecha de "volver" (viewBox 40x40, misma caja que el fondo redondeado del boton) -->
+            <Geometry x:Key="BackArrowGeometry">M16.6573 12.9287C17.0478 12.5385 17.6809 12.5383 18.0713 12.9287C18.4618 13.3191 18.4616 13.9522 18.0713 14.3428L13.4141 19H29C29.5523 19 30 19.4477 30 20C30 20.5523 29.5523 21 29 21H13.4141L18.0713 25.6572C18.4616 26.0478 18.4618 26.6809 18.0713 27.0713C17.6809 27.4617 17.0478 27.4615 16.6573 27.0713L10.293 20.707C9.90249 20.3165 9.90249 19.6835 10.293 19.293L16.6573 12.9287Z</Geometry>
+
+            <!-- Icono de volumen: cuerpo del parlante compartido, ondas (sin silenciar) o X (silenciado) -->
+            <Geometry x:Key="VolumeSpeakerGeometry">M4,9 L7.5,9 L12,5 L12,19 L7.5,15 L4,15 Z</Geometry>
+            <Geometry x:Key="VolumeWavesGeometry">M14.5,8 A5,5 0 0 1 14.5,16 M17.3,5 A9,9 0 0 1 17.3,19</Geometry>
+            <Geometry x:Key="VolumeMuteXGeometry">M14.5,8 L20,16 M20,8 L14.5,16</Geometry>
+
+            <Style x:Key="PlainButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Boton de volver: cuadro redondeado gris con la flecha blanca; al pasar el mouse
+                 el fondo cambia al color de acento. -->
+            <Style x:Key="BackButtonStyle" TargetType="Button" BasedOn="{StaticResource PlainButtonStyle}">
+                <Setter Property="Width" Value="40" />
+                <Setter Property="Height" Value="40" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="BackBg" CornerRadius="8" Background="{StaticResource ControlSurfaceBrush}">
+                                <!-- Canvas de 40x40 (el viewBox del SVG): un Path con Stretch=None se
+                                     mide incluyendo el hueco desde el origen, asi que centrarlo por
+                                     alineacion lo corre. En el lienzo dibuja en sus coordenadas reales. -->
+                                <Canvas Width="40" Height="40">
+                                    <Path Data="{StaticResource BackArrowGeometry}" Fill="White" />
+                                </Canvas>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BackBg" Property="Background" Value="{StaticResource AccentBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="PillButtonStyle" TargetType="Button" BasedOn="{StaticResource PlainButtonStyle}">
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
+            <!-- Se reemplaza la plantilla completa, no solo los colores: la de Windows dibuja una
+                 franja lateral para iconos con los colores del sistema (clara), que se veia como
+                 un bloque blanco cortando el menu sobre el tema oscuro. -->
+            <Style x:Key="DarkContextMenuStyle" TargetType="ContextMenu">
+                <Setter Property="Background" Value="{StaticResource BgSurfaceBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="4" />
+                <Setter Property="HasDropShadow" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContextMenu">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}"
+                                    CornerRadius="8" SnapsToDevicePixels="True">
+                                <ItemsPresenter />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="DarkMenuItemStyle" TargetType="MenuItem">
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Padding" Value="10,7" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="MenuItem">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                                <ContentPresenter ContentSource="Header" Margin="{TemplateBinding Padding}" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource BgSurfaceAltBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="PlayerIconButtonStyle" TargetType="Button" BasedOn="{StaticResource PlainButtonStyle}">
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="Opacity" Value="0.85" />
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Opacity" Value="1" />
+                    </Trigger>
+                    <!-- Va ultimo para ganarle al hover: sin video anterior/siguiente se ve apagado. -->
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.25" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="ThinSeekSliderStyle" TargetType="Slider">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Slider">
+                            <Grid Background="Transparent" VerticalAlignment="Center">
+                                <Track x:Name="PART_Track">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Command="Slider.DecreaseLarge" Background="Transparent" BorderThickness="0" Opacity="0" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Command="Slider.IncreaseLarge" Background="Transparent" BorderThickness="0" Opacity="0" />
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Width="13" Height="13">
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <Ellipse Fill="{StaticResource SeekPlayedBrush}" />
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="ThinVolumeSliderStyle" TargetType="Slider">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Slider">
+                            <Grid Background="Transparent" VerticalAlignment="Center">
+                                <Track x:Name="PART_Track">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Command="Slider.DecreaseLarge" Background="Transparent" BorderThickness="0" Opacity="0" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Command="Slider.IncreaseLarge" Background="Transparent" BorderThickness="0" Opacity="0" />
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Width="11" Height="11">
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <Ellipse Fill="{StaticResource AccentBrush}" />
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="DarkComboBoxStyle" TargetType="ComboBox">
+                <Setter Property="Background" Value="{StaticResource BgSurfaceAltBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="10,0,28,0" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Height" Value="30" />
+                <Setter Property="ItemContainerStyle">
+                    <Setter.Value>
+                        <Style TargetType="ComboBoxItem">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                            <Setter Property="Padding" Value="10,7" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ComboBoxItem">
+                                        <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsHighlighted" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource BgSurfaceAltBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ComboBox">
+                            <Grid>
+                                <ToggleButton x:Name="ToggleButton" ClickMode="Press"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border Background="{Binding Background, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                    BorderBrush="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                    BorderThickness="{Binding BorderThickness, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                    CornerRadius="6">
+                                                <Path Data="M0,0 L6,6 L12,0 Z" Fill="{StaticResource TextSecondaryBrush}"
+                                                      HorizontalAlignment="Right" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                            </Border>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False"
+                                                   Content="{TemplateBinding SelectionBoxItem}"
+                                                   ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                   ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                   Margin="{TemplateBinding Padding}"
+                                                   VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}"
+                                       AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                    <Border Background="{StaticResource BgSurfaceBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1" CornerRadius="6" Padding="4" MaxHeight="220">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ItemsPresenter />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <DataTemplate DataType="{x:Type vm:FoldersViewModel}">
+                <views:FoldersView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:LibraryViewModel}">
+                <views:LibraryView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:PlayerViewModel}">
+                <views:PlayerView />
+            </DataTemplate>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,167 @@
+<UserControl x:Class="VideoSerialVisualizer.Views.PlayerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
+             xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:PlayerViewModel}"
+             Background="{StaticResource BgPrimaryBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--
+             El video se renderiza en una ventana nativa de Windows embebida (HwndHost), no como
+             un elemento grafico normal de WPF. Esas ventanas nativas siempre se dibujan por encima
+             de cualquier control WPF con el que se superpongan, sin importar el z-order del XAML
+             ("airspace problem"). Por eso el VideoView NUNCA debe compartir fila/celda con controles:
+             tiene su propia fila y los controles van en filas separadas, sin superposicion.
+        -->
+        <Button Grid.Row="0" Style="{StaticResource BackButtonStyle}" HorizontalAlignment="Left" Margin="16"
+                Command="{Binding BackCommand}" ToolTip="Volver a la biblioteca" />
+
+        <!-- El video se aloja en una ventana nativa hija (MediaPlayer.Hwnd) via WindowsFormsHost.
+             Se evita a proposito el VideoView de LibVLCSharp.WPF: ese usa una ventana superpuesta
+             separada que debe seguir la posicion del control en pantalla, y con multi-monitor / DPI
+             calcula mal y termina mostrando el video enorme en una ventana aparte. -->
+        <wfi:WindowsFormsHost Grid.Row="1" x:Name="VideoHost" Background="Black" />
+
+        <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" Padding="16,10,16,10">
+            <StackPanel>
+                <!-- Barra de progreso delgada -->
+                <Grid Height="14">
+                    <Grid VerticalAlignment="Center" Height="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
+                            <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}, ConverterParameter=Inverse}" />
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="0" Fill="{StaticResource SeekPlayedBrush}" />
+                        <Rectangle Grid.Column="1" Fill="{StaticResource SeekTrackBrush}" />
+                    </Grid>
+                    <Slider x:Name="SeekSlider" Style="{StaticResource ThinSeekSliderStyle}" VerticalAlignment="Center"
+                            Minimum="0" Maximum="{Binding DurationMs}" Value="{Binding PositionMs, Mode=TwoWay}"
+                            IsMoveToPointEnabled="True" />
+                </Grid>
+
+                <!-- Controles -->
+                <Grid Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding PlayPreviousCommand}"
+                            IsEnabled="{Binding HasPreviousVideo}" ToolTip="Video anterior">
+                        <Viewbox Width="17" Height="17">
+                            <Path Data="{StaticResource SkipPreviousGeometry}" Fill="{StaticResource TextPrimaryBrush}" />
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Column="1" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding PlayPauseCommand}"
+                            ToolTip="Reproducir/Pausar">
+                        <TextBlock Text="{Binding IsPlaying, Converter={StaticResource PlayPauseIconConverter}}"
+                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+
+                    <Button Grid.Column="2" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding PlayNextCommand}"
+                            IsEnabled="{Binding HasNextVideo}" ToolTip="Video siguiente">
+                        <Viewbox Width="17" Height="17">
+                            <Path Data="{StaticResource SkipNextGeometry}" Fill="{StaticResource TextPrimaryBrush}" />
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Column="3" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding ToggleMuteCommand}"
+                            ToolTip="Silenciar">
+                        <Viewbox Width="18" Height="18">
+                            <Grid Width="24" Height="24">
+                                <Path Data="{StaticResource VolumeSpeakerGeometry}" Fill="{StaticResource TextPrimaryBrush}" />
+                                <Path Data="{StaticResource VolumeWavesGeometry}" Stroke="{StaticResource TextPrimaryBrush}"
+                                      StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Visibility="{Binding IsMuted, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+                                <Path Data="{StaticResource VolumeMuteXGeometry}" Stroke="{StaticResource TextPrimaryBrush}"
+                                      StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Visibility="{Binding IsMuted, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </Grid>
+                        </Viewbox>
+                    </Button>
+
+                    <Grid Grid.Column="4" Width="80" Height="20" VerticalAlignment="Center" Margin="2,0,0,0">
+                        <Grid VerticalAlignment="Center" Height="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding Volume, Converter={StaticResource PercentToGridLengthConverter}}" />
+                                <ColumnDefinition Width="{Binding Volume, Converter={StaticResource PercentToGridLengthConverter}, ConverterParameter=Inverse}" />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Column="0" Fill="{StaticResource AccentBrush}" RadiusX="2" RadiusY="2" />
+                            <Rectangle Grid.Column="1" Fill="{StaticResource SeekTrackBrush}" RadiusX="2" RadiusY="2" />
+                        </Grid>
+                        <Slider Style="{StaticResource ThinVolumeSliderStyle}" VerticalAlignment="Center"
+                                Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}"
+                                IsMoveToPointEnabled="True" ToolTip="Volumen" />
+                    </Grid>
+
+                    <Button Grid.Column="5" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding ToggleSubtitlesCommand}"
+                            ToolTip="Subtítulos" Margin="6,0,0,0" Width="30" Height="30"
+                            Visibility="{Binding HasSubtitleTracks, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border CornerRadius="4"
+                                Background="{Binding SubtitlesEnabled, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=#1CA1D0;Transparent}">
+                            <TextBlock Text="CC" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Button>
+
+                    <ComboBox Grid.Column="6" Style="{StaticResource DarkComboBoxStyle}" Width="140" Margin="8,0,0,0"
+                              ItemsSource="{Binding SubtitleTracks}" DisplayMemberPath="Name"
+                              SelectedItem="{Binding SelectedSubtitleTrack, Mode=TwoWay}"
+                              Visibility="{Binding HasMultipleSubtitleTracks, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              ToolTip="Elegir pista de subtítulos" />
+
+                    <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <TextBlock Text="{Binding CurrentTimeText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text=" / " Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+                        <TextBlock Text="{Binding TotalTimeText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+                    </StackPanel>
+
+                    <!-- Aparece en los ultimos 30s: el relleno avanza hasta que el video termina
+                         y encadena solo con el siguiente. Clic = pasar al siguiente ya mismo. -->
+                    <Button Grid.Column="8" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayNextCommand}"
+                            ToolTip="Siguiente video"
+                            Visibility="{Binding IsNextFillVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border CornerRadius="6" Height="30" ClipToBounds="True"
+                                Background="{StaticResource BgSurfaceAltBrush}"
+                                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
+                            <Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="{Binding NextFillPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
+                                        <ColumnDefinition Width="{Binding NextFillPercent, Converter={StaticResource PercentToGridLengthConverter}, ConverterParameter=Inverse}" />
+                                    </Grid.ColumnDefinitions>
+                                    <Rectangle Grid.Column="0" Fill="{StaticResource AccentBrush}" />
+                                    <Rectangle Grid.Column="1" Fill="Transparent" />
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
+                                    <TextBlock Text="Siguiente" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="&#9654;" FontSize="10" Margin="8,0,0,0"
+                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
