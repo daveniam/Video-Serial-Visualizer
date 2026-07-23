@@ -2,9 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="Asignar categoría" Height="440" Width="380"
+        Title="{loc:Tr Category_AssignTitle}" Height="440" Width="380"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BgPrimaryBrush}"
         ShowInTaskbar="False">
@@ -15,7 +16,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Elegí una categoría para este grupo" Foreground="{StaticResource TextPrimaryBrush}"
+        <TextBlock Grid.Row="0" Text="{loc:Tr Category_ChooseForGroup}" Foreground="{StaticResource TextPrimaryBrush}"
                    FontWeight="SemiBold" Margin="0,0,0,14" />
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -25,12 +26,12 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Style="{StaticResource PlainButtonStyle}" Click="Cancel_Click" Margin="0,0,10,0">
                 <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="16,8">
-                    <TextBlock Text="Cancelar" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" />
+                    <TextBlock Text="{loc:Tr Common_Cancel}" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" />
                 </Border>
             </Button>
             <Button Style="{StaticResource PlainButtonStyle}" Click="Save_Click" IsDefault="True">
                 <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="16,8">
-                    <TextBlock Text="Guardar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                    <TextBlock Text="{loc:Tr Common_Save}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
                 </Border>
             </Button>
         </StackPanel>

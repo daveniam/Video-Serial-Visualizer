@@ -4,6 +4,7 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Models;
 
 namespace VideoSerialVisualizer.Views;
@@ -18,7 +19,7 @@ public partial class AssignCategoryDialog : Window
     {
         InitializeComponent();
 
-        AddOption("Sin categoría", null, currentCategoryId is null);
+        AddOption(Loc.I["Category_None"], null, currentCategoryId is null);
         foreach (var category in categories)
             AddOption(category.Name, category.Id, currentCategoryId == category.Id);
     }

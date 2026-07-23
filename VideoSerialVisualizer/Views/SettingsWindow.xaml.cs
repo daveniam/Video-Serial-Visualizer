@@ -3,14 +3,39 @@
 // Software libre, sin garantia alguna. Ver LICENSE para los terminos completos.
 
 using System.Windows;
+using System.Windows.Controls;
+using VideoSerialVisualizer.Localization;
+using VideoSerialVisualizer.Services;
 
 namespace VideoSerialVisualizer.Views;
 
 public partial class SettingsWindow : Window
 {
+    private bool _isLoadingLanguages;
+
     public SettingsWindow()
     {
         InitializeComponent();
+
+        // Se rellena el selector marcando el idioma activo, sin que eso dispare el guardado.
+        _isLoadingLanguages = true;
+        LanguageCombo.ItemsSource = Loc.Available;
+        LanguageCombo.SelectedItem = Loc.Available.FirstOrDefault(l => l.Code == Loc.I.CurrentCode);
+        _isLoadingLanguages = false;
+    }
+
+    private void Language_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingLanguages || LanguageCombo.SelectedItem is not LanguageOption option)
+            return;
+
+        Loc.I.SetLanguage(option.Code);
+
+        // La preferencia se guarda al momento: si la app se cierra de forma abrupta, el idioma
+        // elegido ya quedo registrado.
+        var settings = AppSettings.Load();
+        settings.Language = option.Code;
+        settings.Save();
     }
 
     private void About_Click(object sender, RoutedEventArgs e)

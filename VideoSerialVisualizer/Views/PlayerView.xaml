@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
              xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
@@ -23,7 +24,7 @@
              tiene su propia fila y los controles van en filas separadas, sin superposicion.
         -->
         <Button Grid.Row="0" Style="{StaticResource BackButtonStyle}" HorizontalAlignment="Left" Margin="16"
-                Command="{Binding BackCommand}" ToolTip="Volver a la biblioteca" />
+                Command="{Binding BackCommand}" ToolTip="{loc:Tr Player_BackToLibrary}" />
 
         <!-- El video se aloja en una ventana nativa hija (MediaPlayer.Hwnd) via WindowsFormsHost.
              Se evita a proposito el VideoView de LibVLCSharp.WPF: ese usa una ventana superpuesta
@@ -64,27 +65,27 @@
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding PlayPreviousCommand}"
-                            IsEnabled="{Binding HasPreviousVideo}" ToolTip="Video anterior">
+                            IsEnabled="{Binding HasPreviousVideo}" ToolTip="{loc:Tr Player_PreviousVideo}">
                         <Viewbox Width="17" Height="17">
                             <Path Data="{StaticResource SkipPreviousGeometry}" Fill="{StaticResource TextPrimaryBrush}" />
                         </Viewbox>
                     </Button>
 
                     <Button Grid.Column="1" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding PlayPauseCommand}"
-                            ToolTip="Reproducir/Pausar">
+                            ToolTip="{loc:Tr Player_PlayPause}">
                         <TextBlock Text="{Binding IsPlaying, Converter={StaticResource PlayPauseIconConverter}}"
                                    Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
 
                     <Button Grid.Column="2" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding PlayNextCommand}"
-                            IsEnabled="{Binding HasNextVideo}" ToolTip="Video siguiente">
+                            IsEnabled="{Binding HasNextVideo}" ToolTip="{loc:Tr Player_NextVideo}">
                         <Viewbox Width="17" Height="17">
                             <Path Data="{StaticResource SkipNextGeometry}" Fill="{StaticResource TextPrimaryBrush}" />
                         </Viewbox>
                     </Button>
 
                     <Button Grid.Column="3" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding ToggleMuteCommand}"
-                            ToolTip="Silenciar">
+                            ToolTip="{loc:Tr Player_Mute}">
                         <Viewbox Width="18" Height="18">
                             <Grid Width="24" Height="24">
                                 <Path Data="{StaticResource VolumeSpeakerGeometry}" Fill="{StaticResource TextPrimaryBrush}" />
@@ -109,11 +110,11 @@
                         </Grid>
                         <Slider Style="{StaticResource ThinVolumeSliderStyle}" VerticalAlignment="Center"
                                 Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}"
-                                IsMoveToPointEnabled="True" ToolTip="Volumen" />
+                                IsMoveToPointEnabled="True" ToolTip="{loc:Tr Player_Volume}" />
                     </Grid>
 
                     <Button Grid.Column="5" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding ToggleSubtitlesCommand}"
-                            ToolTip="Subtítulos" Margin="6,0,0,0" Width="30" Height="30"
+                            ToolTip="{loc:Tr Player_Subtitles}" Margin="6,0,0,0" Width="30" Height="30"
                             Visibility="{Binding HasSubtitleTracks, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Border CornerRadius="4"
                                 Background="{Binding SubtitlesEnabled, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=#1CA1D0;Transparent}">
@@ -126,13 +127,13 @@
                               ItemsSource="{Binding SubtitleTracks}" DisplayMemberPath="Name"
                               SelectedItem="{Binding SelectedSubtitleTrack, Mode=TwoWay}"
                               Visibility="{Binding HasMultipleSubtitleTracks, Converter={StaticResource BooleanToVisibilityConverter}}"
-                              ToolTip="Elegir pista de subtítulos" />
+                              ToolTip="{loc:Tr Player_ChooseSubtitleTrack}" />
 
                     <!-- Velocidad de reproduccion: util para recorrer tutoriales mas rapido. -->
                     <ComboBox Grid.Column="7" Style="{StaticResource DarkComboBoxStyle}" Width="82" Margin="8,0,0,0"
                               ItemsSource="{Binding PlaybackSpeeds}" DisplayMemberPath="Label"
                               SelectedItem="{Binding SelectedPlaybackSpeed, Mode=TwoWay}"
-                              ToolTip="Velocidad de reproducción" />
+                              ToolTip="{loc:Tr Player_PlaybackSpeed}" />
 
                     <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
                         <TextBlock Text="{Binding CurrentTimeText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" />
@@ -144,7 +145,7 @@
                          y encadena solo con el siguiente. Clic = pasar al siguiente ya mismo. -->
                     <Button Grid.Column="9" HorizontalAlignment="Right" VerticalAlignment="Center"
                             Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayNextCommand}"
-                            ToolTip="Siguiente video"
+                            ToolTip="{loc:Tr Player_NextVideo}"
                             Visibility="{Binding IsNextFillVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Border CornerRadius="6" Height="30" ClipToBounds="True"
                                 Background="{StaticResource BgSurfaceAltBrush}"
@@ -159,7 +160,7 @@
                                     <Rectangle Grid.Column="1" Fill="Transparent" />
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
-                                    <TextBlock Text="Siguiente" FontSize="12" FontWeight="SemiBold"
+                                    <TextBlock Text="{loc:Tr Player_Next}" FontSize="12" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                     <TextBlock Text="&#9654;" FontSize="10" Margin="8,0,0,0"
                                                Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />

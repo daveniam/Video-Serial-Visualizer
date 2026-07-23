@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using VideoSerialVisualizer.Localization;
 
 namespace VideoSerialVisualizer.Views;
 
@@ -18,7 +19,7 @@ public partial class AboutWindow : Window
         InitializeComponent();
 
         var version = Assembly.GetExecutingAssembly().GetName().Version;
-        VersionText.Text = $"Versión {version?.ToString(3) ?? "1.0.0"}";
+        VersionText.Text = string.Format(Loc.I["About_Version"], version?.ToString(3) ?? "1.0.0");
         CopyrightText.Text = "Copyright © 2026 David Nieves";
     }
 
@@ -43,9 +44,8 @@ public partial class AboutWindow : Window
         }
 
         MessageBox.Show(
-            $"No se encontró el archivo \"{fileName}\" junto a la aplicación.\n\n" +
-            "Podés consultarlo en el repositorio del proyecto.",
-            "Acerca de",
+            string.Format(Loc.I["About_FileMissing"], fileName),
+            Loc.I["About_Title"],
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }

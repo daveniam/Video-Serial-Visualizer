@@ -4,6 +4,7 @@
 
 using System.Threading;
 using System.Windows;
+using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Services;
 using VideoSerialVisualizer.ViewModels;
 
@@ -28,7 +29,7 @@ public partial class App : Application
         {
             _singleInstanceMutex.Dispose();
             _singleInstanceMutex = null;
-            MessageBox.Show("Video Serial Visualizer ya está abierto.", "Video Serial Visualizer", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(Loc.I["App_AlreadyRunning"], "Video Serial Visualizer", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
@@ -63,8 +64,8 @@ public partial class App : Application
     private static void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
         MessageBox.Show(
-            $"Ocurrió un error inesperado y se evitó el cierre de la app:\n\n{e.Exception.Message}",
-            "Video Serial Visualizer - Error",
+            string.Format(Loc.I["Error_Unexpected_Handled"], e.Exception.Message),
+            Loc.I["Error_Unexpected_Title"],
             MessageBoxButton.OK,
             MessageBoxImage.Warning);
         e.Handled = true;
@@ -75,8 +76,8 @@ public partial class App : Application
         if (e.ExceptionObject is Exception ex)
         {
             MessageBox.Show(
-                $"Ocurrió un error inesperado:\n\n{ex.Message}",
-                "Video Serial Visualizer - Error",
+                string.Format(Loc.I["Error_Unexpected_Message"], ex.Message),
+                Loc.I["Error_Unexpected_Title"],
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }

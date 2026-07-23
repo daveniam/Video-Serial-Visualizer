@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 using VideoSerialVisualizer.Data;
+using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Helpers;
 using VideoSerialVisualizer.Models;
 using VideoSerialVisualizer.Services;
@@ -62,14 +63,14 @@ public partial class FoldersViewModel : ObservableObject
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "Seleccionar carpeta de tutoriales"
+            Title = Loc.I["Scan_PickFolder"]
         };
 
         if (dialog.ShowDialog() != true)
             return;
 
         IsScanning = true;
-        StatusMessage = "Buscando videos...";
+        StatusMessage = Loc.I["Scan_Searching"];
         ScanProgressPercent = 0;
 
         try
@@ -77,13 +78,13 @@ public partial class FoldersViewModel : ObservableObject
             var added = await _scannerService.ScanFolderAsync(dialog.FolderName,
                 new Progress<ScanProgress>(p =>
                 {
-                    StatusMessage = $"Procesando {p.Current} de {p.Total}: {p.FileName}";
+                    StatusMessage = string.Format(Loc.I["Scan_Processing"], p.Current, p.Total, p.FileName);
                     ScanProgressPercent = p.Total > 0 ? p.Current / (double)p.Total * 100.0 : 0;
                 }));
 
             StatusMessage = added.Count > 0
-                ? $"Se agregaron {added.Count} video(s)."
-                : "No se encontraron videos nuevos.";
+                ? string.Format(Loc.I["Scan_Added"], added.Count)
+                : Loc.I["Scan_NoNewVideos"];
 
             await RefreshAsync();
         }
@@ -197,7 +198,7 @@ public partial class FoldersViewModel : ObservableObject
     [RelayCommand]
     private async Task AddCategoryAsync()
     {
-        var name = RenameCategoryDialog.PromptForName(string.Empty, Application.Current.MainWindow, "Nueva categoría");
+        var name = RenameCategoryDialog.PromptForName(string.Empty, Application.Current.MainWindow, Loc.I["Category_NewTitle"]);
         if (string.IsNullOrWhiteSpace(name))
             return;
 
@@ -205,7 +206,7 @@ public partial class FoldersViewModel : ObservableObject
 
         if (Categories.Any(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
-            MessageBox.Show($"Ya existe una categoría llamada \"{name}\".", "Categoría duplicada",
+            MessageBox.Show(string.Format(Loc.I["Category_Duplicate_Message"], name), Loc.I["Category_Duplicate_Title"],
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -223,7 +224,7 @@ public partial class FoldersViewModel : ObservableObject
         if (category is null)
             return;
 
-        var newName = RenameCategoryDialog.PromptForName(category.Name, Application.Current.MainWindow, "Renombrar categoría");
+        var newName = RenameCategoryDialog.PromptForName(category.Name, Application.Current.MainWindow, Loc.I["Category_RenameTitle"]);
         if (string.IsNullOrWhiteSpace(newName))
             return;
 
@@ -231,7 +232,7 @@ public partial class FoldersViewModel : ObservableObject
 
         if (Categories.Any(c => c.Id != category.Id && string.Equals(c.Name, newName, StringComparison.OrdinalIgnoreCase)))
         {
-            MessageBox.Show($"Ya existe una categoría llamada \"{newName}\".", "Categoría duplicada",
+            MessageBox.Show(string.Format(Loc.I["Category_Duplicate_Message"], newName), Loc.I["Category_Duplicate_Title"],
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -254,9 +255,8 @@ public partial class FoldersViewModel : ObservableObject
             return;
 
         var confirm = MessageBox.Show(
-            $"¿Eliminar la categoría \"{category.Name}\"?\n\n" +
-            "Los grupos que la tengan asignada quedan sin categoría; esto no borra ningún grupo ni archivo.",
-            "Eliminar categoría",
+            string.Format(Loc.I["Category_Delete_Message"], category.Name),
+            Loc.I["Category_Delete_Title"],
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
@@ -284,9 +284,8 @@ public partial class FoldersViewModel : ObservableObject
             return;
 
         var confirm = MessageBox.Show(
-            $"¿Eliminar el grupo \"{card.DisplayName}\" con {card.VideoCount} video(s)?\n\n" +
-            "Esto NO borra los archivos de tu computadora, solo los quita de Video Serial Visualizer.",
-            "Eliminar grupo",
+            string.Format(Loc.I["Group_Delete_Message"], card.DisplayName, card.VideoCount),
+            Loc.I["Group_Delete_Title"],
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 

@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LibVLCSharp.Shared;
 using VideoSerialVisualizer.Helpers;
+using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Models;
 using VideoSerialVisualizer.Services;
 
@@ -263,8 +264,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
             var nombre = CurrentVideo?.NombreArchivo ?? "este video";
             MessageBox.Show(
-                $"No se pudo reproducir \"{nombre}\". El archivo puede estar dañado o tener un formato/códec no soportado.",
-                "Error de reproducción",
+                string.Format(Loc.I["Error_Playback_Message"], nombre),
+                Loc.I["Error_Playback_Title"],
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
 
@@ -453,7 +454,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             if (track.Id == -1)
                 continue;
 
-            SubtitleTracks.Add(new SubtitleTrackOption(track.Id, string.IsNullOrWhiteSpace(track.Name) ? $"Pista {track.Id}" : track.Name));
+            SubtitleTracks.Add(new SubtitleTrackOption(track.Id, string.IsNullOrWhiteSpace(track.Name) ? string.Format(Loc.I["Player_SubtitleTrackFallback"], track.Id) : track.Name));
         }
 
         HasSubtitleTracks = SubtitleTracks.Count > 0;

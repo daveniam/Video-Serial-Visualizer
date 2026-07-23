@@ -78,6 +78,12 @@
     <Resource Include="Assets\AppIcon.ico" />
   </ItemGroup>
 
+  <!-- Traducciones embebidas en el ejecutable: no hay archivos sueltos que se puedan perder
+       ni rutas que resolver en tiempo de ejecucion. Ver Localization/Loc.cs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\*.json" />
+  </ItemGroup>
+
   <!-- La GPL/LGPL exigen que la licencia y la atribucion acompañen a la copia distribuida,
        no que esten solo en el repositorio: por eso se copian junto al ejecutable.
        Lo mismo vale para las licencias de los componentes de terceros: MIT y Apache-2.0

@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
         mc:Ignorable="d"
-        Title="Ajustar categoría" Width="380" SizeToContent="Height"
+        Title="{loc:Tr Category_AdjustTitle}" Width="380" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BgPrimaryBrush}"
         ShowInTaskbar="False">
@@ -17,7 +18,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Nombre de la categoría" Foreground="{StaticResource TextPrimaryBrush}"
+        <TextBlock Grid.Row="0" Text="{loc:Tr Category_NameLabel}" Foreground="{StaticResource TextPrimaryBrush}"
                    FontWeight="SemiBold" Margin="0,0,0,10" />
 
         <Border Grid.Row="1" Background="{StaticResource BgSurfaceBrush}" CornerRadius="8"
@@ -30,12 +31,12 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button Style="{StaticResource PlainButtonStyle}" Click="Cancel_Click" Margin="0,0,10,0">
                 <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="16,8">
-                    <TextBlock Text="Cancelar" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" />
+                    <TextBlock Text="{loc:Tr Common_Cancel}" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" />
                 </Border>
             </Button>
             <Button Style="{StaticResource PlainButtonStyle}" Click="Save_Click" IsDefault="True">
                 <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="16,8">
-                    <TextBlock Text="Guardar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                    <TextBlock Text="{loc:Tr Common_Save}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
                 </Border>
             </Button>
         </StackPanel>

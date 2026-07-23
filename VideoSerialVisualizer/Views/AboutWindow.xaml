@@ -2,9 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="Acerca de" Height="520" Width="520"
+        Title="{loc:Tr About_Title}" Height="520" Width="520"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BgPrimaryBrush}"
         ShowInTaskbar="False">
@@ -28,7 +29,7 @@
 
         <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,16,0,0"
                    Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
-                   Text="Reproductor de series de video que conserva tu progreso exacto en la línea de tiempo entre sesiones, y reúne carpetas enteras de videos o cursos en un solo lugar organizado." />
+                   Text="{loc:Tr About_Description}" />
 
         <!-- Aviso legal requerido por la GPL para programas interactivos -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0">
@@ -36,39 +37,39 @@
                 <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="8"
                         BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" Padding="14">
                     <StackPanel>
-                        <TextBlock Text="Licencia" FontWeight="SemiBold" FontSize="13"
+                        <TextBlock Text="{loc:Tr About_License}" FontWeight="SemiBold" FontSize="13"
                                    Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
-                                   Text="Este programa es software libre: podés redistribuirlo y/o modificarlo bajo los términos de la Licencia Pública General GNU (GPL), versión 3 o posterior, publicada por la Free Software Foundation." />
+                                   Text="{loc:Tr About_LicenseBody}" />
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,10,0,0"
-                                   Text="Se distribuye SIN GARANTÍA ALGUNA; ni siquiera la garantía implícita de comerciabilidad o aptitud para un propósito determinado. Consultá la licencia para más detalles." />
+                                   Text="{loc:Tr About_NoWarranty}" />
                     </StackPanel>
                 </Border>
 
                 <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="8" Margin="0,12,0,0"
                         BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" Padding="14">
                     <StackPanel>
-                        <TextBlock Text="Componentes de terceros" FontWeight="SemiBold" FontSize="13"
+                        <TextBlock Text="{loc:Tr About_ThirdParty}" FontWeight="SemiBold" FontSize="13"
                                    Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
-                                   Text="La reproducción de video usa libVLC y LibVLCSharp, de VideoLAN (LGPL-2.1 o posterior). Ver los avisos de terceros para el detalle completo." />
+                                   Text="{loc:Tr About_ThirdPartyBody}" />
                     </StackPanel>
                 </Border>
 
                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                     <Button Style="{StaticResource PlainButtonStyle}" Click="ViewLicense_Click" Margin="0,0,8,0">
                         <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="12,7">
-                            <TextBlock Text="Ver licencia" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="{loc:Tr About_ViewLicense}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
                         </Border>
                     </Button>
                     <Button Style="{StaticResource PlainButtonStyle}" Click="ViewNotices_Click" Margin="0,0,8,0">
                         <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="12,7">
-                            <TextBlock Text="Avisos de terceros" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="{loc:Tr About_ViewNotices}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
                         </Border>
                     </Button>
                     <Button Style="{StaticResource PlainButtonStyle}" Click="ViewSource_Click">
                         <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="12,7">
-                            <TextBlock Text="Código fuente" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="{loc:Tr About_SourceCode}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
                         </Border>
                     </Button>
                 </StackPanel>
@@ -78,7 +79,7 @@
         <Button Grid.Row="3" Style="{StaticResource PlainButtonStyle}" HorizontalAlignment="Right"
                 Margin="0,18,0,0" Click="Close_Click" IsDefault="True">
             <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="18,9">
-                <TextBlock Text="Cerrar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                <TextBlock Text="{loc:Tr Common_Close}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
             </Border>
         </Button>
     </Grid>

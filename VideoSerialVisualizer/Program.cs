@@ -17,6 +17,8 @@
 
 using System.Windows;
 using Velopack;
+using VideoSerialVisualizer.Localization;
+using VideoSerialVisualizer.Services;
 
 namespace VideoSerialVisualizer;
 
@@ -34,6 +36,11 @@ public static class Program
     public static void Main(string[] args)
     {
         VelopackApp.Build().Run();
+
+        // El idioma se fija antes de crear la ventana: la pantalla de carga ya aparece traducida.
+        // Si el usuario nunca eligio uno, se usa el de Windows (con ingles como respaldo).
+        var settings = AppSettings.Load();
+        Loc.I.SetLanguage(settings.Language ?? Loc.DetectSystemLanguage());
 
         var app = new App();
         app.InitializeComponent();

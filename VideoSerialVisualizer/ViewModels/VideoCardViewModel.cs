@@ -5,6 +5,7 @@
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using VideoSerialVisualizer.Helpers;
+using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Models;
 
 namespace VideoSerialVisualizer.ViewModels;
@@ -40,7 +41,11 @@ public partial class VideoCardViewModel : ObservableObject
             ProgressPercent = Math.Clamp(progress.PosicionMs / (double)video.DuracionMs * 100.0, 0, 100);
         }
 
-        ProgressText = Completado ? "Completado" : ProgressPercent > 0 ? $"{ProgressPercent:0}% visto" : "Sin ver";
+        ProgressText = Completado
+            ? Loc.I["Progress_Completed"]
+            : ProgressPercent > 0
+                ? string.Format(Loc.I["Progress_Watched"], Math.Round(ProgressPercent))
+                : Loc.I["Progress_Unwatched"];
     }
 
     public async Task LoadThumbnailAsync()

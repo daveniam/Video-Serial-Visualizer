@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using LibVLCSharp.Shared;
 using Microsoft.Data.Sqlite;
 using VideoSerialVisualizer.Data;
+using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Models;
 using VideoSerialVisualizer.Services;
 
@@ -25,7 +26,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool isLoading = true;
 
     [ObservableProperty]
-    private string loadingMessage = "Iniciando...";
+    private string loadingMessage = Loc.I["Startup_Starting"];
 
     public FoldersViewModel? FoldersViewModel { get; private set; }
     public LibraryViewModel? LibraryViewModel { get; private set; }
@@ -33,7 +34,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public async Task InitializeAsync()
     {
-        LoadingMessage = "Iniciando reproductor...";
+        LoadingMessage = Loc.I["Startup_Player"];
         await Task.Run(() =>
         {
             Core.Initialize();
@@ -42,7 +43,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _libVlc = new LibVLC("--avcodec-hw=none");
         });
 
-        LoadingMessage = "Preparando base de datos...";
+        LoadingMessage = Loc.I["Startup_Database"];
         await using (var db = new AppDbContext())
         {
             try
@@ -67,7 +68,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(LibraryViewModel));
         OnPropertyChanged(nameof(PlayerViewModel));
 
-        LoadingMessage = "Cargando biblioteca...";
+        LoadingMessage = Loc.I["Startup_Library"];
         await FoldersViewModel.InitializeAsync();
 
         CurrentViewModel = FoldersViewModel;
