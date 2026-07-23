@@ -92,6 +92,8 @@ function Invoke-SignPathSigning {
     # un fallo a mitad de camino no deja un binario corrupto en su lugar.
     $signedPath = "$Path.signed"
 
+    # Los timeouts generosos son por el tamano: el instalador pesa ~127 MB y hay que subirlo,
+    # esperar la firma y volver a bajarlo. Con los valores por defecto puede cortarse a mitad.
     Submit-SigningRequest `
         -InputArtifactPath $Path `
         -ApiToken $SignPathApiToken `
@@ -99,7 +101,9 @@ function Invoke-SignPathSigning {
         -ProjectSlug $SignPathProjectSlug `
         -SigningPolicySlug $SignPathPolicySlug `
         -OutputArtifactPath $signedPath `
-        -WaitForCompletion
+        -WaitForCompletion `
+        -WaitForCompletionTimeoutInSeconds 1800 `
+        -UploadAndDownloadRequestTimeoutInSeconds 1800
 
     if (-not (Test-Path $signedPath)) {
         throw "SignPath no devolvio un archivo firmado para $Label"
