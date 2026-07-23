@@ -174,8 +174,36 @@ if ($Sign) {
     Write-Host "  (omitido)" -ForegroundColor DarkGray
 }
 
-Write-Host "`nListo. Archivos en: $releasesDir" -ForegroundColor Green
-Write-Host "Instalador: VideoSerialVisualizer-win-Setup.exe" -ForegroundColor Green
+# --------------------------------------------------------------------------------------------
+# Carpeta lista para publicar
+#
+# .\Releases NO se puede reorganizar en subcarpetas: vpk necesita encontrar ahi los .nupkg de las
+# versiones anteriores para calcular los deltas. Por eso se deja plana como directorio de trabajo,
+# y aparte se arma .\Publicar\v<version> con una COPIA de lo que hay que subir a GitHub.
+# Asi cada release queda separada y no hay que adivinar que archivo corresponde a cual.
+# --------------------------------------------------------------------------------------------
+Write-Host "`nPreparando carpeta para publicar..." -ForegroundColor Cyan
+
+$publishReleaseDir = Join-Path $PSScriptRoot "Publicar\v$Version"
+if (Test-Path $publishReleaseDir) {
+    Remove-Item $publishReleaseDir -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path $publishReleaseDir | Out-Null
+
+# Se copia todo el contenido de Releases: los indices referencian tambien los paquetes de
+# versiones previas, asi que subirlos completos garantiza que cualquier usuario, venga de la
+# version que venga, encuentre lo que necesita.
+Copy-Item -Path (Join-Path $releasesDir "*") -Destination $publishReleaseDir -Force
+
+$total = (Get-ChildItem $publishReleaseDir | Measure-Object -Property Length -Sum).Sum
+Write-Host ("  {0} archivos, {1:N0} MB" -f (Get-ChildItem $publishReleaseDir).Count, ($total / 1MB)) -ForegroundColor Green
+
+Write-Host "`nListo." -ForegroundColor Green
+Write-Host "  Directorio de trabajo : $releasesDir" -ForegroundColor DarkGray
+Write-Host "  PARA SUBIR A GITHUB   : $publishReleaseDir" -ForegroundColor Green
+Write-Host "  Instalador            : VideoSerialVisualizer-win-Setup.exe" -ForegroundColor Green
+Write-Host ""
+Write-Host "Crea el Release en GitHub con tag v$Version y adjunta TODO el contenido de Publicar\v$Version" -ForegroundColor Cyan
 
 if (-not $Sign) {
     Write-Host ""

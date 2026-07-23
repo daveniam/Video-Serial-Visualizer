@@ -9,6 +9,8 @@ obj/
 # Las releases se distribuyen adjuntas a los Releases de GitHub, no versionadas en el repo.
 /publish/
 /Releases/
+# Copia por version de lo que se sube a cada Release de GitHub (la genera build-release.ps1).
+/Publicar/
 
 # === Material de prueba ===
 # Videos usados para probar la app a mano. Son archivos pesados y no forman parte del proyecto.
