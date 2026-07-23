@@ -10,6 +10,10 @@ obj/
 /publish/
 /Releases/
 
+# === Material de prueba ===
+# Videos usados para probar la app a mano. Son archivos pesados y no forman parte del proyecto.
+/Videos/
+
 # === Entorno de desarrollo ===
 # Configuracion local de Claude Code: es de tu maquina, no del proyecto.
 .claude/settings.local.json
