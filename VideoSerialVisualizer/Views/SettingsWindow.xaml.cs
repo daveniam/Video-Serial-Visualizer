@@ -9,6 +9,12 @@ public partial class SettingsWindow : Window
         InitializeComponent();
     }
 
+    private void About_Click(object sender, RoutedEventArgs e)
+    {
+        var about = new AboutWindow { Owner = this };
+        about.ShowDialog();
+    }
+
     private void Close_Click(object sender, RoutedEventArgs e)
     {
         Close();

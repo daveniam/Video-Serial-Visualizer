@@ -1,0 +1,85 @@
+<Window x:Class="VideoSerialVisualizer.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Acerca de" Height="520" Width="520"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BgPrimaryBrush}"
+        ShowInTaskbar="False">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Encabezado -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Video Serial Visualizer" FontSize="22" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock x:Name="VersionText" Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12" Margin="0,4,0,0" />
+            <TextBlock x:Name="CopyrightText" Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12" Margin="0,2,0,0" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,16,0,0"
+                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
+                   Text="Reproductor de series de video que conserva tu progreso exacto en la línea de tiempo entre sesiones, y reúne carpetas enteras de videos o cursos en un solo lugar organizado." />
+
+        <!-- Aviso legal requerido por la GPL para programas interactivos -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0">
+            <StackPanel>
+                <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="8"
+                        BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="Licencia" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                   Text="Este programa es software libre: podés redistribuirlo y/o modificarlo bajo los términos de la Licencia Pública General GNU (GPL), versión 3 o posterior, publicada por la Free Software Foundation." />
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,10,0,0"
+                                   Text="Se distribuye SIN GARANTÍA ALGUNA; ni siquiera la garantía implícita de comerciabilidad o aptitud para un propósito determinado. Consultá la licencia para más detalles." />
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="8" Margin="0,12,0,0"
+                        BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="Componentes de terceros" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                   Text="La reproducción de video usa libVLC y LibVLCSharp, de VideoLAN (LGPL-2.1 o posterior). Ver los avisos de terceros para el detalle completo." />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                    <Button Style="{StaticResource PlainButtonStyle}" Click="ViewLicense_Click" Margin="0,0,8,0">
+                        <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="12,7">
+                            <TextBlock Text="Ver licencia" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </Button>
+                    <Button Style="{StaticResource PlainButtonStyle}" Click="ViewNotices_Click" Margin="0,0,8,0">
+                        <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="12,7">
+                            <TextBlock Text="Avisos de terceros" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </Button>
+                    <Button Style="{StaticResource PlainButtonStyle}" Click="ViewSource_Click">
+                        <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="12,7">
+                            <TextBlock Text="Código fuente" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Button Grid.Row="3" Style="{StaticResource PlainButtonStyle}" HorizontalAlignment="Right"
+                Margin="0,18,0,0" Click="Close_Click" IsDefault="True">
+            <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="18,9">
+                <TextBlock Text="Cerrar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+            </Border>
+        </Button>
+    </Grid>
+</Window>

@@ -136,11 +136,18 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Button Grid.Row="7" Style="{StaticResource PlainButtonStyle}" HorizontalAlignment="Right" Margin="0,16,0,0"
-                Click="Close_Click">
-            <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="18,9">
-                <TextBlock Text="Cerrar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
-            </Border>
-        </Button>
+        <Grid Grid.Row="7" Margin="0,16,0,0">
+            <Button Style="{StaticResource PlainButtonStyle}" HorizontalAlignment="Left" Click="About_Click">
+                <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="18,9">
+                    <TextBlock Text="Acerca de" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                </Border>
+            </Button>
+
+            <Button Style="{StaticResource PlainButtonStyle}" HorizontalAlignment="Right" Click="Close_Click">
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="18,9">
+                    <TextBlock Text="Cerrar" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                </Border>
+            </Button>
+        </Grid>
     </Grid>
 </Window>
