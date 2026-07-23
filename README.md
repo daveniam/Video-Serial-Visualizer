@@ -47,8 +47,31 @@ There's also a portable `.zip` if you'd rather not install anything.
 
 **Requirements:** Windows 10 or later, 64-bit. Nothing else — the .NET runtime and VLC are bundled.
 
-> Windows SmartScreen may warn you the first time, because the installer isn't code-signed yet.
-> Click **More info → Run anyway** if you're comfortable doing so.
+The installer needs no administrator rights: it installs into your user folder and creates the
+shortcuts for you.
+
+### About the SmartScreen warning
+
+Windows will show **"Windows protected your PC"** the first time you run the installer. To proceed,
+click **More info → Run anyway**.
+
+This happens because the installer is **not code-signed yet**, and it's fair to be cautious about
+that — so here's the honest explanation rather than a "just click through it".
+
+A code-signing certificate costs a few hundred dollars a year, which is hard to justify for a free
+project. [SignPath.io](https://signpath.org) grants them at no cost to open-source projects, and
+this one has been submitted for review; the signature will be in place once that's approved.
+Until then Windows has no publisher identity to check, so it warns — the same warning any unsigned
+program gets, whether or not there's anything wrong with it.
+
+**If you'd rather not take my word for it**, you don't have to:
+
+- Every line of this app is in this repository, and the release is built from it with
+  [`build-release.ps1`](build-release.ps1) — no hidden steps.
+- You can [build it yourself](#building-from-source) and skip the download entirely. The result is
+  the same application.
+- The installer is unsigned, **not** signed by an unknown party. If Windows ever reports a
+  publisher on this app that isn't listed here, that build did not come from this project.
 
 ---
 
