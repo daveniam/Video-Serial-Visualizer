@@ -29,9 +29,9 @@
   <!-- Version e identidad del producto. Velopack compara esta version para decidir si hay
        actualizacion, asi que hay que subirla en cada release publicada (SemVer). -->
   <PropertyGroup>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
     <Product>Video Serial Visualizer</Product>
     <Description>Reproductor de series de video basado en VLC que conserva tu progreso exacto en la linea de tiempo entre sesiones, y reune carpetas enteras de videos o cursos en un solo lugar organizado.</Description>
     <Authors>David Nieves</Authors>
