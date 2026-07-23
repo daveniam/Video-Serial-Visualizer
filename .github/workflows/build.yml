@@ -1,0 +1,60 @@
+name: build
+
+# Verifica que el proyecto compile en una maquina limpia, que es justamente lo que no
+# garantiza compilar en la maquina del autor. Corre en Windows porque la app es WPF + x64.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # El paquete de LibVLC pesa mas de 100 MB: sin cache cada corrida lo vuelve a bajar.
+      - name: Cache de paquetes NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore VideoSerialVisualizer/VideoSerialVisualizer.csproj
+
+      - name: Build
+        run: dotnet build VideoSerialVisualizer/VideoSerialVisualizer.csproj -c Release --no-restore
+
+      # Los archivos de licencia tienen que viajar con el binario (ver THIRD-PARTY-NOTICES).
+      # Si alguien rompe el ItemGroup del .csproj, se entera aca y no despues de publicar.
+      - name: Verificar que las licencias esten en la salida
+        shell: pwsh
+        run: |
+          $out = "VideoSerialVisualizer/bin/Release/net8.0-windows/win-x64"
+          $requeridos = @(
+            "$out/LICENSE",
+            "$out/THIRD-PARTY-NOTICES.md",
+            "$out/licenses/MIT.txt",
+            "$out/licenses/LGPL-2.1.txt",
+            "$out/licenses/Apache-2.0.txt"
+          )
+          $faltantes = $requeridos | Where-Object { -not (Test-Path $_) }
+          if ($faltantes) {
+            Write-Host 'Faltan archivos de licencia en la salida del build:'
+            $faltantes | ForEach-Object { Write-Host "  - $_" }
+            exit 1
+          }
+          Write-Host 'OK: todos los archivos de licencia estan en la salida.'

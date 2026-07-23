@@ -1,0 +1,78 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are welcome in English or Spanish — whichever you prefer.
+
+        For anything security-related, **stop** and read
+        [SECURITY.md](https://github.com/daveniam/Video-Serial-Visualizer/blob/main/SECURITY.md)
+        instead. Please don't report vulnerabilities in a public issue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a folder with ...
+        2. Open the video ...
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown in the "Acerca de" window.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-type
+    attributes:
+      label: How did you install it?
+      options:
+        - Installer (Setup.exe)
+        - Portable .zip
+        - Built from source
+    validations:
+      required: true
+
+  - type: textarea
+    id: video-details
+    attributes:
+      label: Video details, if the problem involves a specific file
+      description: >
+        Container and codec help a lot here, since playback is handled by libVLC. If VLC itself
+        plays the file correctly but this app doesn't, please say so — that narrows it down
+        considerably.
+      placeholder: "e.g. .mkv, H.264 + AAC, external .srt subtitles"
+
+  - type: textarea
+    id: crash
+    attributes:
+      label: Did the app close on its own?
+      description: >
+        Some libVLC failures take the whole process down with no error dialog. If the app
+        vanished rather than showing a message, say so and mention whether it happened while
+        playing, while seeking, or while thumbnails were being generated.

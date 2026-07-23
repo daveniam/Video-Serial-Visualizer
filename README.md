@@ -9,7 +9,11 @@ so an entire course library lives in one organized place instead of scattered ac
 
 Free and open source. Works fully offline — no account, no cloud, no telemetry.
 
-> **Note:** the application interface is currently in Spanish.
+> **Note on language:** the application interface is in Spanish, and so is the codebase — code
+> comments and commit messages included. Only the outward-facing docs (this README,
+> [CONTRIBUTING](CONTRIBUTING.md), [SECURITY](SECURITY.md)) are in English. That split is
+> deliberate; see [CONTRIBUTING.md](CONTRIBUTING.md#language). Issues and pull requests are
+> welcome in either language.
 
 ---
 
@@ -78,6 +82,15 @@ for MVVM, and [Velopack](https://velopack.io/) for installation and updates.
 
 Video is rendered into a native child window handed to libVLC directly, rather than through a
 WPF overlay — this avoids the positioning bugs that overlay approaches hit on multi-monitor setups.
+
+---
+
+## Contributing
+
+Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the build,
+the language conventions, and a few things about the video rendering and libVLC that are worth
+knowing before you dig in. For security issues, see [SECURITY.md](SECURITY.md) — please don't
+open a public issue for those.
 
 ---
 

@@ -37,8 +37,18 @@
     <Authors>David Nieves</Authors>
     <Company>David Nieves</Company>
     <Copyright>Copyright © 2026 David Nieves</Copyright>
+    <!-- Solo lo consumen "dotnet pack" y los escaneres de licencias que leen el .csproj.
+         En un WinExe no llega al binario: para eso esta el AssemblyMetadata de abajo. -->
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
   </PropertyGroup>
+
+  <!-- La GPL exige que quien recibe el binario pueda llegar al codigo fuente. Esto deja la
+       licencia y la URL del repositorio dentro del ensamblado, asi el ejecutable se identifica
+       solo aunque se lo separe de la carpeta que lo acompana. -->
+  <ItemGroup>
+    <AssemblyMetadata Include="License" Value="GPL-3.0-or-later" />
+    <AssemblyMetadata Include="SourceUrl" Value="https://github.com/daveniam/Video-Serial-Visualizer" />
+  </ItemGroup>
 
   <!-- La app es x64-only: sin esto el paquete de LibVLC copia TAMBIEN el runtime x86
        (~96 MB muertos, un 25% de la descarga). -->
