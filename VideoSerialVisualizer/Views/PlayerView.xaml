@@ -59,6 +59,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
@@ -127,7 +128,13 @@
                               Visibility="{Binding HasMultipleSubtitleTracks, Converter={StaticResource BooleanToVisibilityConverter}}"
                               ToolTip="Elegir pista de subtítulos" />
 
-                    <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                    <!-- Velocidad de reproduccion: util para recorrer tutoriales mas rapido. -->
+                    <ComboBox Grid.Column="7" Style="{StaticResource DarkComboBoxStyle}" Width="82" Margin="8,0,0,0"
+                              ItemsSource="{Binding PlaybackSpeeds}" DisplayMemberPath="Label"
+                              SelectedItem="{Binding SelectedPlaybackSpeed, Mode=TwoWay}"
+                              ToolTip="Velocidad de reproducción" />
+
+                    <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
                         <TextBlock Text="{Binding CurrentTimeText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" />
                         <TextBlock Text=" / " Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
                         <TextBlock Text="{Binding TotalTimeText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
@@ -135,7 +142,7 @@
 
                     <!-- Aparece en los ultimos 30s: el relleno avanza hasta que el video termina
                          y encadena solo con el siguiente. Clic = pasar al siguiente ya mismo. -->
-                    <Button Grid.Column="8" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    <Button Grid.Column="9" HorizontalAlignment="Right" VerticalAlignment="Center"
                             Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayNextCommand}"
                             ToolTip="Siguiente video"
                             Visibility="{Binding IsNextFillVisible, Converter={StaticResource BooleanToVisibilityConverter}}">

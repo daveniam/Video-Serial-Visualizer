@@ -93,6 +93,16 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool hasPreviousVideo;
 
+    /// <summary>Velocidades de reproduccion disponibles (fijas, no cambian en tiempo de ejecucion).</summary>
+    public IReadOnlyList<PlaybackSpeedOption> PlaybackSpeeds => PlaybackSpeedOption.All;
+
+    /// <summary>
+    /// Velocidad elegida. Se mantiene entre videos: si estabas viendo a 1.5x, el siguiente arranca
+    /// igual, que es lo esperable cuando se recorre un curso entero.
+    /// </summary>
+    [ObservableProperty]
+    private PlaybackSpeedOption selectedPlaybackSpeed = PlaybackSpeedOption.Normal;
+
     /// <summary>El boton "Siguiente" se muestra recien en los ultimos segundos del video.</summary>
     [ObservableProperty]
     private bool isNextFillVisible;
@@ -218,6 +228,10 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
                 _hasLoadedSubtitleTracks = true;
                 RefreshSubtitleTracks();
             }
+
+            // LibVLC vuelve a 1x con cada media nuevo, asi que la velocidad elegida se reaplica
+            // cada vez que arranca una reproduccion, no solo cuando el usuario la cambia.
+            ApplyPlaybackSpeed();
         });
     }
 
@@ -409,6 +423,24 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     {
         MediaPlayer.Volume = value;
         OnPropertyChanged(nameof(IsMuted));
+    }
+
+    partial void OnSelectedPlaybackSpeedChanged(PlaybackSpeedOption value) => ApplyPlaybackSpeed();
+
+    /// <summary>
+    /// Aplica la velocidad al reproductor. SetRate devuelve distinto de 0 si falla (algunos
+    /// formatos no admiten cambio de ritmo); en ese caso se vuelve a 1x para que la UI no muestre
+    /// una velocidad que en realidad no se esta aplicando.
+    /// </summary>
+    private void ApplyPlaybackSpeed()
+    {
+        var target = SelectedPlaybackSpeed ?? PlaybackSpeedOption.Normal;
+
+        if (MediaPlayer.SetRate(target.Rate) == 0)
+            return;
+
+        if (target.Rate != PlaybackSpeedOption.Normal.Rate)
+            SelectedPlaybackSpeed = PlaybackSpeedOption.Normal;
     }
 
     private void RefreshSubtitleTracks()
