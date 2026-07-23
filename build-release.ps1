@@ -113,7 +113,19 @@ function Invoke-SignPathSigning {
 
     $signature = Get-AuthenticodeSignature -FilePath $Path
     if ($signature.Status -ne 'Valid') {
-        throw "La firma de $Label quedo en estado '$($signature.Status)'"
+        $cert = $signature.SignerCertificate
+
+        # Subject == Issuer significa certificado auto-firmado: tipicamente la policy de "test
+        # signing" de SignPath. Windows no lo considera de confianza, asi que no sirve de nada
+        # frente a SmartScreen. Conviene decirlo explicito y no dejar un 'UnknownError' a secas.
+        if ($cert -and $cert.Subject -eq $cert.Issuer) {
+            throw ("El certificado usado es AUTO-FIRMADO ($($cert.Subject)), no uno de confianza " +
+                   "publica. Sirve para probar el flujo, pero SmartScreen lo trata igual que un " +
+                   "binario sin firmar. Revisa que -SignPathPolicySlug apunte a la policy de " +
+                   "release y no a la de test.")
+        }
+
+        throw "La firma de $Label quedo en estado '$($signature.Status)': $($signature.StatusMessage)"
     }
 
     Write-Host "  OK: $Label firmado por $($signature.SignerCertificate.Subject)" -ForegroundColor Green
