@@ -69,10 +69,13 @@
   </ItemGroup>
 
   <!-- La GPL/LGPL exigen que la licencia y la atribucion acompañen a la copia distribuida,
-       no que esten solo en el repositorio: por eso se copian junto al ejecutable. -->
+       no que esten solo en el repositorio: por eso se copian junto al ejecutable.
+       Lo mismo vale para las licencias de los componentes de terceros: MIT y Apache-2.0
+       exigen que su texto viaje con el binario, no alcanza con nombrarlas. -->
   <ItemGroup>
     <Content Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

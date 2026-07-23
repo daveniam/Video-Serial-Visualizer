@@ -87,6 +87,10 @@ Licensed under the **GNU General Public License v3.0 or later** — see [LICENSE
 
 The GPL is not an arbitrary choice here: the app ships VLC's plugin set, and some of those plugins
 are GPL-licensed, which carries over to the work as a whole. See
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for full attribution of every bundled component.
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for full attribution of every bundled component
+and for where to get the corresponding source of each one, including libVLC itself.
+
+The full license texts of the bundled dependencies live in [licenses/](licenses/). Both that
+folder and `LICENSE` are copied next to the executable, so every distributed copy carries them.
 
 Copyright © 2026 David Nieves

@@ -9,9 +9,16 @@
 #   - *-full.nupkg / *-delta.nupkg         (paquetes que consume el auto-updater)
 #   - RELEASES                             (indice del feed)
 #
-# Para publicar una actualizacion: subi TODO el contenido de .\Releases a la URL configurada en
-# UpdateService.UpdateFeedUrl, conservando los archivos de versiones anteriores (los delta se
-# calculan contra ellos). Los usuarios instalados la reciben solos al abrir la app.
+# Para publicar una actualizacion:
+#   1. Subi la version en <Version> del .csproj y commiteala.
+#   2. Corre este script.
+#   3. Crea un Release en GitHub (repo: UpdateService.GithubRepoUrl) con tag "v<version>" y
+#      adjunta como assets TODO el contenido de .\Releases.
+#
+# Los .nupkg delta se calculan contra las versiones anteriores, asi que NO borres los assets de
+# releases viejas: Velopack los necesita para armar la actualizacion incremental.
+#
+# Los usuarios instalados la reciben solos al abrir la app (ver UpdateService).
 
 param(
     [string]$Version

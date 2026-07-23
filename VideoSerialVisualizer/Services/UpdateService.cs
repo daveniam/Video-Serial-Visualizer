@@ -35,9 +35,6 @@ public class UpdateService
     {
         try
         {
-            if (GithubRepoUrl.Contains("TODO", StringComparison.OrdinalIgnoreCase))
-                return;
-
             // accessToken null: el repositorio es publico, no hace falta autenticacion.
             var source = new GithubSource(GithubRepoUrl, null, IncludePrereleases);
             var manager = new UpdateManager(source);
