@@ -93,5 +93,8 @@
   "About_ViewLicense": "Ver licencia",
   "About_ViewNotices": "Avisos de terceros",
   "About_SourceCode": "Código fuente",
+  "About_Support": "Apoyar el proyecto",
+  "About_SupportBody": "Video Serial Visualizer es gratuito y siempre lo será. Si te ahorra tiempo, podés apoyar su desarrollo con una contribución voluntaria — cualquier monto suma, y nunca es obligatorio.",
+  "About_Donate": "Apoyar el proyecto",
   "About_FileMissing": "No se encontró el archivo \"{0}\" junto a la aplicación.\n\nPodés consultarlo en el repositorio del proyecto."
 }

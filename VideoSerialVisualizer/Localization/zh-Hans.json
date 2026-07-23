@@ -93,5 +93,8 @@
   "About_ViewLicense": "查看许可协议",
   "About_ViewNotices": "第三方声明",
   "About_SourceCode": "源代码",
+  "About_Support": "支持这个项目",
+  "About_SupportBody": "Video Serial Visualizer 是免费的，并将一直免费。如果它为你节省了时间，你可以通过自愿捐助支持它的开发 —— 任何金额都有帮助，而且从不强制。",
+  "About_Donate": "支持这个项目",
   "About_FileMissing": "未在应用程序旁找到文件「{0}」。\n\n你可以在项目仓库中查看。"
 }

@@ -14,6 +14,9 @@ public partial class AboutWindow : Window
 {
     public const string SourceCodeUrl = "https://github.com/daveniam/Video-Serial-Visualizer";
 
+    /// <summary>Pagina de Gumroad donde se puede apoyar el proyecto (pago voluntario).</summary>
+    public const string DonateUrl = "https://davenieves.gumroad.com/l/ksehea";
+
     public AboutWindow()
     {
         InitializeComponent();
@@ -28,6 +31,8 @@ public partial class AboutWindow : Window
     private void ViewNotices_Click(object sender, RoutedEventArgs e) => OpenBundledFile("THIRD-PARTY-NOTICES.md");
 
     private void ViewSource_Click(object sender, RoutedEventArgs e) => OpenExternal(SourceCodeUrl);
+
+    private void Donate_Click(object sender, RoutedEventArgs e) => OpenExternal(DonateUrl);
 
     /// <summary>
     /// Abre un archivo que se distribuye junto al ejecutable (ver el ItemGroup de Content en el

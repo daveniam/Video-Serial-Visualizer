@@ -93,5 +93,8 @@
   "About_ViewLicense": "View license",
   "About_ViewNotices": "Third-party notices",
   "About_SourceCode": "Source code",
+  "About_Support": "Support the project",
+  "About_SupportBody": "Video Serial Visualizer is free and always will be. If it saves you time, you can support its development with a voluntary contribution — any amount helps, and it is never required.",
+  "About_Donate": "Support the project",
   "About_FileMissing": "The file \"{0}\" was not found next to the application.\n\nYou can read it in the project repository."
 }

@@ -9,11 +9,15 @@ so an entire course library lives in one organized place instead of scattered ac
 
 Free and open source. Works fully offline — no account, no cloud, no telemetry.
 
-> **Note on language:** the application interface is in Spanish, and so is the codebase — code
-> comments and commit messages included. Only the outward-facing docs (this README,
-> [CONTRIBUTING](CONTRIBUTING.md), [SECURITY](SECURITY.md)) are in English. That split is
-> deliberate; see [CONTRIBUTING.md](CONTRIBUTING.md#language). Issues and pull requests are
-> welcome in either language.
+> **Note on language:** the interface ships in seven languages (see Features below). The
+> **codebase** is in Spanish, however — code comments and commit messages included — while the
+> outward-facing docs (this README, [CONTRIBUTING](CONTRIBUTING.md), [SECURITY](SECURITY.md)) are
+> in English. That split is deliberate; see [CONTRIBUTING.md](CONTRIBUTING.md#language). Issues and
+> pull requests are welcome in either language.
+>
+> Translations live in [`VideoSerialVisualizer/Localization/`](VideoSerialVisualizer/Localization/)
+> as one JSON file per language. Fixing an awkward phrase means editing a single line — corrections
+> from native speakers are very welcome, especially for Chinese, Japanese and Russian.
 
 ---
 
@@ -31,6 +35,9 @@ Free and open source. Works fully offline — no account, no cloud, no telemetry
   (embedded tracks or external files, with a track picker when there's more than one).
 - **Auto-advance** — a "next" button fills up over the last 30 seconds and chains into the next
   video when the current one ends.
+- **Seven interface languages** — English, Spanish, Simplified Chinese, Japanese, German, Russian
+  and French. Picked automatically from your Windows language on first run, changeable in Settings,
+  and applied instantly without restarting.
 - **Automatic updates** — checks in the background and installs on exit, never mid-playback.
 
 Your library lives entirely on your machine, in a local SQLite database. Adding folders never
@@ -105,6 +112,18 @@ for MVVM, and [Velopack](https://velopack.io/) for installation and updates.
 
 Video is rendered into a native child window handed to libVLC directly, rather than through a
 WPF overlay — this avoids the positioning bugs that overlay approaches hit on multi-monitor setups.
+
+---
+
+## Supporting the project
+
+Video Serial Visualizer is free and always will be — no paid tier, no locked features, no ads.
+
+If it saves you time and you'd like to give something back, there's a
+**[pay-what-you-want page on Gumroad](https://davenieves.gumroad.com/l/ksehea)** (you can also find
+it under *Settings → About*). Any amount is appreciated and none is expected.
+
+Contributing code, reporting a bug, or fixing a translation helps just as much, and costs nothing.
 
 ---
 
