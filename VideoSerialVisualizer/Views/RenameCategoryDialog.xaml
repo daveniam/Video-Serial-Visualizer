@@ -4,15 +4,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="Ajustar categoría" Height="180" Width="380"
+        Title="Ajustar categoría" Width="380" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BgPrimaryBrush}"
         ShowInTaskbar="False">
     <Grid Margin="20">
+        <!-- Todas las filas son Auto: con SizeToContent="Height" la ventana se adapta al contenido,
+             asi no se recortan los botones si cambia la escala de pantalla o el tamano de fuente. -->
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -26,7 +27,7 @@
                      Padding="10,8" FontSize="14" />
         </Border>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button Style="{StaticResource PlainButtonStyle}" Click="Cancel_Click" Margin="0,0,10,0">
                 <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="16,8">
                     <TextBlock Text="Cancelar" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" />
