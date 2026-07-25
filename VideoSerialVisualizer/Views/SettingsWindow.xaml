@@ -19,6 +19,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -94,10 +95,22 @@
             <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,18,0,0" />
         </StackPanel>
 
-        <TextBlock Grid.Row="5" Text="{loc:Tr Settings_FolderGroups}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+        <!-- Modo animador: activa en el reproductor las herramientas de estudio cuadro a cuadro. -->
+        <StackPanel Grid.Row="5" Margin="0,0,0,18">
+            <TextBlock Text="{loc:Tr Settings_AnimatorMode}" FontSize="16" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Text="{loc:Tr Settings_AnimatorModeHelp}" Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12" Margin="0,4,0,12" TextWrapping="Wrap" />
+            <CheckBox x:Name="AnimatorModeCheck" Style="{StaticResource DarkCheckBoxStyle}"
+                      Content="{loc:Tr Settings_AnimatorModeToggle}"
+                      Checked="AnimatorMode_Changed" Unchecked="AnimatorMode_Changed" />
+            <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,18,0,0" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="6" Text="{loc:Tr Settings_FolderGroups}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
                    Margin="0,0,0,8" />
 
-        <ScrollViewer Grid.Row="6" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="7" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <TextBlock Text="{loc:Tr Settings_FolderGroupsHelp}"
                            Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
@@ -148,7 +161,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Grid Grid.Row="7" Margin="0,16,0,0">
+        <Grid Grid.Row="8" Margin="0,16,0,0">
             <Button Style="{StaticResource PlainButtonStyle}" HorizontalAlignment="Left" Click="About_Click">
                 <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="18,9">
                     <TextBlock Text="{loc:Tr Settings_About}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />

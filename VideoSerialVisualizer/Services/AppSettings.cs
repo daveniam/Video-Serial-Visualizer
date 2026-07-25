@@ -20,6 +20,21 @@ public sealed class AppSettings
     /// <summary>Codigo de idioma elegido, o null para seguir el del sistema.</summary>
     public string? Language { get; set; }
 
+    /// <summary>
+    /// Modo animador: agrega al reproductor las herramientas de estudio cuadro a cuadro (paso a
+    /// fotograma, bucle, seleccion de segmento y etiquetas en la linea de tiempo). Apagado por
+    /// defecto para que la interfaz habitual no cambie a quien no lo necesita.
+    /// </summary>
+    public bool AnimatorModeEnabled { get; set; }
+
+    /// <summary>
+    /// Opacidad de la ventana en modo animador, 20 a 100. Se guarda entre sesiones porque quien
+    /// calca sobre una referencia suele trabajar siempre con el mismo nivel. El piso de 20 es a
+    /// proposito: con menos, la ventana se vuelve tan invisible que cuesta encontrarla para
+    /// devolverla a su estado normal.
+    /// </summary>
+    public double AnimatorWindowOpacityPercent { get; set; } = 100;
+
     private static string FilePath => Path.Combine(AppDbContext.DatabaseDirectory, "settings.json");
 
     public static AppSettings Load()

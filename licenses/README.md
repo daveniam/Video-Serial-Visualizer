@@ -8,9 +8,10 @@ viaje con cada copia del binario.
 | Archivo | Cubre |
 |---|---|
 | `../LICENSE` | Video Serial Visualizer — GPL-3.0-or-later |
-| `MIT.txt` | .NET Runtime, CommunityToolkit.Mvvm, EF Core, Microsoft.Data.Sqlite, Velopack |
-| `LGPL-2.1.txt` | libVLC, LibVLCSharp |
+| `MIT.txt` | .NET Runtime, CommunityToolkit.Mvvm, EF Core, Microsoft.Data.Sqlite, Velopack, FFMediaToolkit, Markdig.Wpf |
+| `LGPL-2.1.txt` | libVLC, LibVLCSharp, FFmpeg (binarios nativos, build LGPL) |
 | `Apache-2.0.txt` | SQLitePCLRaw (`e_sqlite3.dll` y bindings) |
+| `BSD-2-Clause.txt` | Markdig |
 
 SQLite (el motor en si, dentro de `e_sqlite3.dll`) es de dominio publico y no requiere
 texto de licencia: https://www.sqlite.org/copyright.html

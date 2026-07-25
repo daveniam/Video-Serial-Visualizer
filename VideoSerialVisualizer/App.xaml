@@ -15,6 +15,8 @@
             <conv:BoolToBrushConverter x:Key="BoolToBrushConverter" />
             <conv:PercentToGridLengthConverter x:Key="PercentToGridLengthConverter" />
             <conv:PlayPauseIconConverter x:Key="PlayPauseIconConverter" />
+            <conv:TickHighlightConverter x:Key="TickHighlightConverter" />
+            <conv:PercentToCanvasLeftConverter x:Key="PercentToCanvasLeftConverter" />
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
             <!-- Paleta tema oscuro -->
@@ -287,6 +289,42 @@
                                     </Border>
                                 </Popup>
                             </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Casilla de verificacion del tema oscuro: cuadro con contorno que se rellena con el
+                 color de acento y muestra un tilde al marcarse. La plantilla de Windows usa colores
+                 del sistema (claros) que desentonan con el tema oscuro. -->
+            <Style x:Key="DarkCheckBoxStyle" TargetType="CheckBox">
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="CheckBox">
+                            <StackPanel Orientation="Horizontal" Background="Transparent">
+                                <Border x:Name="Box" Width="20" Height="20" CornerRadius="5"
+                                        Background="{StaticResource BgSurfaceAltBrush}"
+                                        BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                    <Path x:Name="Check" Data="M5,10 L9,14 L15,6" Stroke="White" StrokeThickness="2"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Stretch="None" Visibility="Collapsed" />
+                                </Border>
+                                <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}" />
+                                    <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                    <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>

@@ -1,0 +1,46 @@
+<Window x:Class="VideoSerialVisualizer.Views.MarkerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
+        mc:Ignorable="d"
+        Title="{loc:Tr Marker_NewTitle}" Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BgPrimaryBrush}"
+        ShowInTaskbar="False">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="{loc:Tr Marker_TextLabel}" Foreground="{StaticResource TextPrimaryBrush}"
+                   FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock Grid.Row="1" Text="{loc:Tr Marker_MarkdownHint}" Foreground="{StaticResource TextSecondaryBrush}"
+                   FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10" />
+
+        <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" CornerRadius="8"
+                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
+            <TextBox x:Name="TextBox" Background="Transparent" BorderThickness="0"
+                     Foreground="{StaticResource TextPrimaryBrush}" CaretBrush="{StaticResource TextPrimaryBrush}"
+                     Padding="10,8" FontSize="13" AcceptsReturn="True" TextWrapping="Wrap"
+                     MinHeight="90" MaxHeight="240" VerticalScrollBarVisibility="Auto" />
+        </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Style="{StaticResource PlainButtonStyle}" Click="Cancel_Click" Margin="0,0,10,0">
+                <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="16,8">
+                    <TextBlock Text="{loc:Tr Common_Cancel}" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" />
+                </Border>
+            </Button>
+            <Button Style="{StaticResource PlainButtonStyle}" Click="Save_Click">
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="16,8">
+                    <TextBlock Text="{loc:Tr Common_Save}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                </Border>
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

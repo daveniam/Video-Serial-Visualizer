@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<WatchProgress> Progress => Set<WatchProgress>();
     public DbSet<FolderCategory> FolderCategories => Set<FolderCategory>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<VideoMarker> Markers => Set<VideoMarker>();
 
     /// <summary>
     /// IMPORTANTE: se mantiene el nombre historico "TutorialHub" a proposito, aunque el proyecto
@@ -68,6 +69,17 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(f => f.CategoryId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Un video puede tener muchas etiquetas; se borran solas si se borra el video (no tiene
+        // sentido dejar etiquetas huerfanas apuntando a un VideoId que ya no existe).
+        modelBuilder.Entity<VideoMarker>()
+            .HasIndex(m => m.VideoId);
+
+        modelBuilder.Entity<VideoMarker>()
+            .HasOne(m => m.Video)
+            .WithMany()
+            .HasForeignKey(m => m.VideoId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     /// <summary>
@@ -158,6 +170,30 @@ public class AppDbContext : DbContext
                 )");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IX_Categories_Name ON Categories (Name)");
+        }
+
+        var markersTableExists = false;
+        await using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Markers'";
+            var result = await cmd.ExecuteScalarAsync();
+            markersTableExists = result is not null;
+        }
+
+        if (!markersTableExists)
+        {
+            // ON DELETE CASCADE a mano: EnsureCreated/estas sentencias manuales no pasan por las
+            // relaciones configuradas en OnModelCreating, asi que hay que declarar la FK explicita.
+            await db.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE Markers (
+                    Id INTEGER NOT NULL CONSTRAINT PK_Markers PRIMARY KEY AUTOINCREMENT,
+                    VideoId INTEGER NOT NULL,
+                    TimeMs INTEGER NOT NULL,
+                    Texto TEXT NOT NULL,
+                    CONSTRAINT FK_Markers_Videos_VideoId FOREIGN KEY (VideoId) REFERENCES Videos (Id) ON DELETE CASCADE
+                )");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IX_Markers_VideoId ON Markers (VideoId)");
         }
     }
 }

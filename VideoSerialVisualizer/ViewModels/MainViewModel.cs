@@ -59,10 +59,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var thumbnailService = new ThumbnailService(_libVlc!);
         var scannerService = new FolderScannerService(_libVlc!, thumbnailService);
         var progressTracker = new ProgressTrackerService();
+        var markerService = new VideoMarkerService();
 
         FoldersViewModel = new FoldersViewModel(scannerService, OpenFolder);
         LibraryViewModel = new LibraryViewModel(OpenPlayer, BackToFolders);
-        PlayerViewModel = new PlayerViewModel(_libVlc!, progressTracker, BackToLibrary);
+        PlayerViewModel = new PlayerViewModel(_libVlc!, progressTracker, markerService, BackToLibrary);
 
         OnPropertyChanged(nameof(FoldersViewModel));
         OnPropertyChanged(nameof(LibraryViewModel));

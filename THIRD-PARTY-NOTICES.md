@@ -63,6 +63,64 @@ Llega como dependencia de Microsoft.Data.Sqlite y es lo que provee el motor SQLi
 
 Se usa para el instalador y las actualizaciones automáticas.
 
+## FFMediaToolkit — Radosław Kmiotek
+
+- **Versión:** 4.8.1
+- **Copyright:** Copyright (c) 2019-2025 Radosław Kmiotek
+- **Sitio:** https://github.com/radek-k/FFMediaToolkit
+- **Licencia:** MIT (texto y avisos de copyright en `licenses/MIT.txt`)
+
+Binding administrado sobre FFmpeg. Habilita la decodificación cuadro a cuadro exacta del modo
+animador. El paquete NuGet **no** contiene binarios de FFmpeg; esos se distribuyen aparte (ver
+"FFmpeg (binarios nativos)" a continuación).
+
+## Markdig — Alexandre Mutel
+
+- **Versión:** 0.22.0
+- **Copyright:** Copyright (c) Alexandre Mutel. All rights reserved.
+- **Sitio:** https://github.com/lunet-io/markdig
+- **Licencia:** BSD-2-Clause (texto en `licenses/BSD-2-Clause.txt`)
+
+Analizador de Markdown (CommonMark). Convierte el texto de las etiquetas de linea de tiempo
+(modo animador) a un documento con formato.
+
+## Markdig.Wpf — Nicolas Musset
+
+- **Versión:** 0.5.0.1
+- **Copyright:** Copyright © Nicolas Musset 2016-2021
+- **Sitio:** https://github.com/Kryptos-FR/markdig-wpf
+- **Licencia:** MIT (texto y avisos de copyright en `licenses/MIT.txt`)
+
+Renderiza el documento de Markdig como un FlowDocument de WPF, para la vista previa de las
+etiquetas de linea de tiempo.
+
+## FFmpeg (binarios nativos) — proyecto FFmpeg
+
+- **Componentes:** `avcodec-61.dll`, `avformat-61.dll`, `avutil-59.dll`, `swscale-8.dll`,
+  `swresample-5.dll` de **FFmpeg 7.1**, en la carpeta `ffmpeg/` junto al ejecutable
+- **Sitio:** https://ffmpeg.org/
+- **Origen de este build:** build Windows **LGPL** *shared* de FFmpeg 7.1 publicado por el proyecto
+  comunitario BtbN (https://github.com/BtbN/FFmpeg-Builds), sin modificaciones
+- **Licencia:** LGPL-2.1-or-later (texto en `licenses/LGPL-2.1.txt`)
+
+Se distribuye a propósito la variante **LGPL** y no la GPL: esta aplicación solo **decodifica** para
+el paso a cuadro del modo animador, así que los componentes GPL del otro build (codificadores como
+x264/x265) no hacen falta. La variante LGPL además pesa bastante menos.
+
+Sólo se distribuyen esas cinco bibliotecas: son las únicas que el modo animador utiliza (`avfilter`,
+`avdevice` y `postproc` vienen en el build oficial pero no se usan). El resto de la reproducción
+sigue a cargo de libVLC, no de estas bibliotecas.
+
+**Cumplimiento de la LGPL:** las bibliotecas se distribuyen como DLL separadas y sin modificar,
+cargadas dinámicamente. Quien reciba una copia puede reemplazarlas por su propia versión de FFmpeg
+7.x compatible: alcanza con sustituir los archivos de la carpeta `ffmpeg/`.
+
+### Código fuente de FFmpeg
+
+FFmpeg publica su código fuente en https://ffmpeg.org/download.html (la versión distribuida aquí es
+la 7.1). Los scripts de build usados para generar estos binarios están en
+https://github.com/BtbN/FFmpeg-Builds.
+
 ## .NET Runtime — .NET Foundation / Microsoft
 
 - **Componente:** runtime de .NET 8 y bibliotecas base, incluidas en la publicación

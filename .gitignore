@@ -16,6 +16,12 @@ obj/
 # Videos usados para probar la app a mano. Son archivos pesados y no forman parte del proyecto.
 /Videos/
 
+# === Binarios nativos de FFmpeg (modo animador, decodificacion cuadro a cuadro) ===
+# Las DLLs de FFmpeg (avcodec, avformat, avutil, swscale, swresample) pesan ~89 MB y no van al repo:
+# son binarios de terceros, se bajan aparte. Se usa el build LGPL shared de FFmpeg 7.1 de
+# BtbN/FFmpeg-Builds, quedandose solo con esas cinco. Ver THIRD-PARTY-NOTICES.md.
+/ffmpeg/
+
 # === Entorno de desarrollo ===
 # Configuracion local de Claude Code: es de tu maquina, no del proyecto.
 .claude/settings.local.json

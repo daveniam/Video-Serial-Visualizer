@@ -29,9 +29,9 @@
   <!-- Version e identidad del producto. Velopack compara esta version para decidir si hay
        actualizacion, asi que hay que subirla en cada release publicada (SemVer). -->
   <PropertyGroup>
-    <Version>1.0.2</Version>
-    <AssemblyVersion>1.0.2.0</AssemblyVersion>
-    <FileVersion>1.0.2.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <Product>Video Serial Visualizer</Product>
     <Description>Reproductor de series de video basado en VLC que conserva tu progreso exacto en la linea de tiempo entre sesiones, y reune carpetas enteras de videos o cursos en un solo lugar organizado.</Description>
     <Authors>David Nieves</Authors>
@@ -69,9 +69,18 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="LibVLCSharp" Version="3.9.0" />
     <PackageReference Include="LibVLCSharp.WPF" Version="3.9.0" />
+    <!-- Etiquetas de linea de tiempo (modo animador): Markdig parsea el texto, Markdig.Wpf lo
+         renderiza como FlowDocument. Markdig se referencia explicito porque se usa directo
+         (MarkdownPipelineBuilder), no solo como dependencia transitiva de Markdig.Wpf. -->
+    <PackageReference Include="Markdig" Version="0.22.0" />
+    <PackageReference Include="Markdig.Wpf" Version="0.5.0.1" />
     <PackageReference Include="Velopack" Version="1.2.0" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
+    <!-- Decodificacion cuadro a cuadro exacta (modo animador). El binding es MIT y NO trae los
+         binarios nativos de FFmpeg: esos se cablean aparte (build a medida de FFmpeg 7.x shared).
+         Ver THIRD-PARTY-NOTICES.md. -->
+    <PackageReference Include="FFMediaToolkit" Version="4.8.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -92,6 +101,19 @@
     <Content Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Binarios nativos de FFmpeg para el paso a cuadro exacto (modo animador). Se toman de la
+       carpeta gitignorada ..\ffmpeg\ (no versionada: ver .gitignore).
+
+       Se listan SOLO las cinco bibliotecas que el modo animador necesita de verdad (verificado
+       ejecutando abrir + sondear metadata + seek + decodificar + convertir con unicamente estas):
+       avfilter, avdevice y postproc tambien vienen en el build de FFmpeg pero no se usan, y pesan
+       ~38 MB juntas. El comodin cubre el sufijo de version (avcodec-61, -62, ...) para que un
+       cambio de version de FFmpeg no rompa silenciosamente la copia. -->
+  <ItemGroup>
+    <Content Include="..\ffmpeg\avcodec-*.dll;..\ffmpeg\avformat-*.dll;..\ffmpeg\avutil-*.dll;..\ffmpeg\swscale-*.dll;..\ffmpeg\swresample-*.dll"
+             Link="ffmpeg\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

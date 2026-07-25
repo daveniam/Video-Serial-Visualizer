@@ -61,14 +61,40 @@ public partial class App : Application
         base.OnExit(e);
     }
 
+    /// <summary>
+    /// Evita que un error que se repite en cada repintado tape la pantalla de dialogos.
+    ///
+    /// MessageBox.Show bombea la cola de mensajes de Windows: mientras el dialogo esta abierto, WPF
+    /// sigue procesando layout/render, y si la excepcion venia justo de ahi (p.ej. un binding
+    /// invalido en un template) vuelve a dispararse, entra de nuevo a este handler y abre OTRO
+    /// dialogo sobre el anterior. La recursion no para hasta agotar la pila del proceso
+    /// ("a new guard page for the stack cannot be created"). Con esta guarda solo se muestra el
+    /// primer error; los que lleguen mientras ese dialogo sigue abierto se marcan como manejados
+    /// en silencio.
+    /// </summary>
+    private static bool _isShowingUnhandledErrorDialog;
+
     private static void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
-        MessageBox.Show(
-            string.Format(Loc.I["Error_Unexpected_Handled"], e.Exception.Message),
-            Loc.I["Error_Unexpected_Title"],
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        // Siempre se marca manejado: la app sigue viva aunque no se muestre este error puntual.
         e.Handled = true;
+
+        if (_isShowingUnhandledErrorDialog)
+            return;
+
+        _isShowingUnhandledErrorDialog = true;
+        try
+        {
+            MessageBox.Show(
+                string.Format(Loc.I["Error_Unexpected_Handled"], e.Exception.Message),
+                Loc.I["Error_Unexpected_Title"],
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _isShowingUnhandledErrorDialog = false;
+        }
     }
 
     private static void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)

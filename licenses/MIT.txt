@@ -28,6 +28,14 @@ acompanen a toda copia distribuida; ese es el proposito de este archivo.
     Copyright (c) Velopack Ltd. All rights reserved.
     https://github.com/velopack/velopack
 
+  * FFMediaToolkit 4.8.1 (binding administrado; NO incluye binarios de FFmpeg)
+    Copyright (c) 2019-2025 Radoslaw Kmiotek
+    https://github.com/radek-k/FFMediaToolkit
+
+  * Markdig.Wpf 0.5.0.1
+    Copyright © Nicolas Musset 2016-2021
+    https://github.com/Kryptos-FR/markdig-wpf
+
 
 Texto de la licencia
 --------------------

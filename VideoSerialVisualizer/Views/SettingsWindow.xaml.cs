@@ -12,16 +12,35 @@ namespace VideoSerialVisualizer.Views;
 public partial class SettingsWindow : Window
 {
     private bool _isLoadingLanguages;
+    private bool _isInitializing;
 
     public SettingsWindow()
     {
         InitializeComponent();
 
-        // Se rellena el selector marcando el idioma activo, sin que eso dispare el guardado.
+        // Se rellenan los controles con el estado actual sin que eso dispare el guardado.
+        _isInitializing = true;
+
         _isLoadingLanguages = true;
         LanguageCombo.ItemsSource = Loc.Available;
         LanguageCombo.SelectedItem = Loc.Available.FirstOrDefault(l => l.Code == Loc.I.CurrentCode);
         _isLoadingLanguages = false;
+
+        AnimatorModeCheck.IsChecked = AppSettings.Load().AnimatorModeEnabled;
+
+        _isInitializing = false;
+    }
+
+    private void AnimatorMode_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+            return;
+
+        // Se guarda al momento, igual que el idioma: si la app se cierra de golpe, la preferencia
+        // ya quedo registrada. Toma efecto la proxima vez que se abre un video.
+        var settings = AppSettings.Load();
+        settings.AnimatorModeEnabled = AnimatorModeCheck.IsChecked == true;
+        settings.Save();
     }
 
     private void Language_SelectionChanged(object sender, SelectionChangedEventArgs e)

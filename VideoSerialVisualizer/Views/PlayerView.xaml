@@ -6,9 +6,28 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
              xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
+             xmlns:helpers="clr-namespace:VideoSerialVisualizer.Helpers"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:PlayerViewModel}"
              Background="{StaticResource BgPrimaryBrush}">
+    <!-- Atajos del modo animador. Solo se disparan mientras el foco de teclado de WPF esta dentro
+         de este control (ver PlayerView.xaml.cs: se reclama el foco tras cada clic en el video,
+         porque un clic nativo se lo lleva a la ventana hija de LibVLC). Los comandos de loop/
+         segmento/paso a cuadro ya se auto-protegen con IsAnimatorModeEnabled, asi que estos
+         bindings quedan activos siempre sin filtrar nada aca. Espacio (play/pausa) es la excepcion:
+         es una funcion base, no especifica del modo animador. -->
+    <UserControl.InputBindings>
+        <KeyBinding Key="Space" Command="{Binding PlayPauseCommand}" />
+        <KeyBinding Key="OemComma" Command="{Binding StepFrameBackwardCommand}" />
+        <KeyBinding Key="OemPeriod" Command="{Binding StepFrameForwardCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="Left" Command="{Binding StepFrameBackwardCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="Right" Command="{Binding StepFrameForwardCommand}" />
+        <KeyBinding Key="I" Command="{Binding SetSegmentStartCommand}" />
+        <KeyBinding Key="O" Command="{Binding SetSegmentEndCommand}" />
+        <KeyBinding Key="L" Command="{Binding ToggleLoopCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding ClearSegmentCommand}" />
+        <KeyBinding Key="M" Command="{Binding AddMarkerCommand}" />
+    </UserControl.InputBindings>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -30,13 +49,151 @@
              Se evita a proposito el VideoView de LibVLCSharp.WPF: ese usa una ventana superpuesta
              separada que debe seguir la posicion del control en pantalla, y con multi-monitor / DPI
              calcula mal y termina mostrando el video enorme en una ventana aparte. -->
-        <wfi:WindowsFormsHost Grid.Row="1" x:Name="VideoHost" Background="Black" />
+        <!-- Tres formas de mostrar el video, mutuamente excluyentes:
+               1. Ventana nativa de LibVLC: el camino rapido, con el modo animador apagado.
+               2. Imagen WPF en vivo (render por callbacks): en modo animador, para que el video sea
+                  contenido WPF y pueda transparentarse / llevarse a la ventana flotante.
+               3. Imagen WPF del cuadro exacto de FFmpeg: mientras se revisa cuadro a cuadro. -->
+        <Grid Grid.Row="1" Background="Black">
+            <wfi:WindowsFormsHost x:Name="VideoHost" Background="Black"
+                                   Visibility="{Binding IsNativeVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+            <Image Source="{Binding VideoFrame}" Stretch="Uniform"
+                   Visibility="{Binding IsCallbackVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                   MouseLeftButtonDown="FrameStepImage_MouseLeftButtonDown" />
+
+            <Image Source="{Binding FrameStepImage}" Stretch="Uniform"
+                   Visibility="{Binding IsFrameStepVisibleInMain, Converter={StaticResource BooleanToVisibilityConverter}}"
+                   MouseLeftButtonDown="FrameStepImage_MouseLeftButtonDown" />
+
+            <!-- Con la ventana de referencia abierta el video se dibuja SOLO alla. Sin este cartel,
+                 la ventana principal quedaria en negro y pareceria que algo se rompio. -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Visibility="{Binding IsReferenceWindowOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Viewbox Width="44" Height="44" HorizontalAlignment="Center" Opacity="0.5">
+                    <Grid Width="24" Height="24">
+                        <Rectangle Width="15" Height="11" Stroke="{StaticResource TextSecondaryBrush}"
+                                   StrokeThickness="1.8" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                   Margin="1,3,0,0" />
+                        <Rectangle Width="15" Height="11" Stroke="{StaticResource TextSecondaryBrush}"
+                                   StrokeThickness="1.8" Fill="{StaticResource BgPrimaryBrush}"
+                                   HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                   Margin="0,0,1,3" />
+                    </Grid>
+                </Viewbox>
+                <TextBlock Text="{loc:Tr Reference_PlayingInReferenceWindow}" Margin="0,14,0,0"
+                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" />
+            </StackPanel>
+        </Grid>
 
         <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" Padding="16,10,16,10">
             <StackPanel>
-                <!-- Barra de progreso delgada -->
-                <Grid Height="14">
-                    <Grid VerticalAlignment="Center" Height="4">
+                <!-- Barra del modo animador: herramientas de estudio cuadro a cuadro (paso a
+                     fotograma, bucle, seleccion de segmento; las etiquetas se agregan en la fase
+                     siguiente). -->
+                <Border Visibility="{Binding IsAnimatorModeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Paso a cuadro exacto (FFmpeg), atajos "," / "." o Ctrl+Flechas. -->
+                        <Button Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30"
+                                Command="{Binding StepFrameBackwardCommand}" ToolTip="{loc:Tr Player_StepFrameBack}">
+                            <TextBlock Text="&lt;" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+
+                        <Button Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30" Margin="2,0,0,0"
+                                Command="{Binding StepFrameForwardCommand}" ToolTip="{loc:Tr Player_StepFrameForward}">
+                            <TextBlock Text="&gt;" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+
+                        <!-- Numero de cuadro: solo mientras se esta revisando cuadro a cuadro. -->
+                        <TextBlock Text="{Binding FrameNumberText}"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"
+                                   Margin="8,0,0,0" Visibility="{Binding IsFrameStepActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                        <Border Width="1" Height="20" Background="{StaticResource BorderSubtleBrush}" Margin="8,0" />
+
+                        <!-- Bucle: repite el segmento marcado, o el video completo si no hay segmento. -->
+                        <Button Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30"
+                                Command="{Binding ToggleLoopCommand}" ToolTip="{loc:Tr Player_Loop}">
+                            <Border CornerRadius="4"
+                                    Background="{Binding IsLoopEnabled, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=#1CA1D0;Transparent}">
+                                <Viewbox Width="16" Height="16" Margin="7">
+                                    <Grid Width="24" Height="24">
+                                        <Ellipse Width="16" Height="16" Margin="4"
+                                                 Stroke="{StaticResource TextPrimaryBrush}" StrokeThickness="2" />
+                                        <Path Data="M16,2 L20,7 L13,7 Z" Fill="{StaticResource TextPrimaryBrush}" />
+                                    </Grid>
+                                </Viewbox>
+                            </Border>
+                        </Button>
+
+                        <Border Width="1" Height="20" Background="{StaticResource BorderSubtleBrush}" Margin="8,0" />
+
+                        <!-- Marcar entrada / salida del segmento, en la posicion actual del video. -->
+                        <Button Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30"
+                                Command="{Binding SetSegmentStartCommand}" ToolTip="{loc:Tr Player_SetSegmentStart}">
+                            <TextBlock Text="[" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+
+                        <Button Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30" Margin="2,0,0,0"
+                                Command="{Binding SetSegmentEndCommand}" ToolTip="{loc:Tr Player_SetSegmentEnd}">
+                            <TextBlock Text="]" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+
+                        <!-- Rango marcado + boton para quitarlo; solo aparece si hay un segmento. -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0"
+                                    Visibility="{Binding HasSegment, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="{Binding SegmentRangeText}" Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center" />
+                            <Button Style="{StaticResource PlainButtonStyle}" Margin="6,0,0,0" Padding="4"
+                                    Command="{Binding ClearSegmentCommand}" ToolTip="{loc:Tr Player_ClearSegment}">
+                                <TextBlock Text="&#10005;" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" />
+                            </Button>
+                        </StackPanel>
+
+                        <Border Width="1" Height="20" Background="{StaticResource BorderSubtleBrush}" Margin="8,0" />
+
+                        <!-- Nueva etiqueta en la posicion actual (atajo M). El texto admite Markdown. -->
+                        <Button Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30"
+                                Command="{Binding AddMarkerCommand}" ToolTip="{loc:Tr Player_AddMarker}">
+                            <Viewbox Width="14" Height="16">
+                                <Path Data="M0,0 L12,0 L12,20 L6,14 L0,20 Z" Fill="{StaticResource TextPrimaryBrush}" />
+                            </Viewbox>
+                        </Button>
+
+                        <Border Width="1" Height="20" Background="{StaticResource BorderSubtleBrush}" Margin="8,0" />
+
+                        <!-- Ventana de referencia flotante: saca el video a una ventana propia,
+                             semitransparente y siempre encima, para calcar sobre otro programa. -->
+                        <Button Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30"
+                                Command="{Binding ToggleReferenceWindowCommand}" ToolTip="{loc:Tr Reference_Toggle}">
+                            <Border CornerRadius="4"
+                                    Background="{Binding IsReferenceWindowOpen, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=#1CA1D0;Transparent}">
+                                <Viewbox Width="16" Height="16" Margin="7">
+                                    <Grid Width="24" Height="24">
+                                        <Rectangle Width="15" Height="11" Stroke="{StaticResource TextPrimaryBrush}"
+                                                   StrokeThickness="1.8" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                   Margin="1,3,0,0" />
+                                        <Rectangle Width="15" Height="11" Stroke="{StaticResource TextPrimaryBrush}"
+                                                   StrokeThickness="1.8" Fill="{StaticResource BgSurfaceAltBrush}"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                   Margin="0,0,1,3" />
+                                    </Grid>
+                                </Viewbox>
+                            </Border>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Barra de progreso. En modo animador se agranda (SeekBarContainerHeight/
+                     SeekBarTrackHeight) para que la division en cuadros de abajo sea evidente. -->
+                <Grid Height="{Binding SeekBarContainerHeight}">
+                    <Grid VerticalAlignment="Center" Height="{Binding SeekBarTrackHeight}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
                             <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}, ConverterParameter=Inverse}" />
@@ -44,9 +201,127 @@
                         <Rectangle Grid.Column="0" Fill="{StaticResource SeekPlayedBrush}" />
                         <Rectangle Grid.Column="1" Fill="{StaticResource SeekTrackBrush}" />
                     </Grid>
+
+                    <!-- Banda del segmento marcado, superpuesta sobre el fondo de la barra. No es
+                         interactiva: el Slider (declarado despues) sigue quedando arriba para arrastrar. -->
+                    <Grid VerticalAlignment="Center" Height="{Binding SeekBarTrackHeight}" IsHitTestVisible="False"
+                          Visibility="{Binding HasSegment, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{Binding SegmentStartPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
+                            <ColumnDefinition Width="{Binding SegmentBandWidthPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
+                            <ColumnDefinition Width="{Binding SegmentAfterPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Grid.Column="1" Fill="{StaticResource AccentBrush}" Opacity="0.5" />
+                    </Grid>
+
+                    <!-- Marcas de cuadro (modo animador): divide la barra en VisibleFrameTickCount
+                         columnas iguales y dibuja una linea fina en el borde de cada una, para que se
+                         vea que el timeline esta hecho de cuadros discretos y no es continuo. En un
+                         video largo cada marca pasa a representar varios cuadros (ver MaxVisibleFrameTicks
+                         en el ViewModel): no hay forma de dibujar un pixel por cada uno de miles de
+                         cuadros y que siga siendo distinguible. -->
+                    <ItemsControl ItemsSource="{Binding FrameTickIndexes}" IsHitTestVisible="False"
+                                  VerticalAlignment="Center" Height="{Binding SeekBarTrackHeight}"
+                                  Visibility="{Binding HasFrameTicks, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" Columns="{Binding VisibleFrameTickCount}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <!-- Dos capas: el relleno amarillo (opaco, solo en la marca de inicio
+                                     o fin del segmento) y la linea divisoria (sutil, siempre presente,
+                                     incluso sobre el relleno). Separadas para que el relleno no herede
+                                     la opacidad baja de la linea. -->
+                                <Grid>
+                                    <Border>
+                                        <Border.Background>
+                                            <MultiBinding Converter="{StaticResource TickHighlightConverter}">
+                                                <Binding />
+                                                <Binding Path="DataContext.SegmentStartTickIndex" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                                                <Binding Path="DataContext.SegmentEndTickIndex" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                                            </MultiBinding>
+                                        </Border.Background>
+                                    </Border>
+                                    <Border BorderBrush="Black" BorderThickness="1,0,0,0" Opacity="0.35" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
                     <Slider x:Name="SeekSlider" Style="{StaticResource ThinSeekSliderStyle}" VerticalAlignment="Center"
                             Minimum="0" Maximum="{Binding DurationMs}" Value="{Binding PositionMs, Mode=TwoWay}"
                             IsMoveToPointEnabled="True" />
+
+                    <!-- Etiquetas de linea de tiempo (modo animador): un rombo en la posicion exacta
+                         de cada marca, con vista previa Markdown al pasar el mouse. Van DESPUES del
+                         Slider en el XAML para quedar arriba en el z-order: sin esto, el Slider (que
+                         cubre toda la barra para el clic-a-punto) interceptaria los clics que apuntan
+                         a un marcador puntual en vez de dejarselos al boton del marcador. -->
+                    <ItemsControl ItemsSource="{Binding Markers}" Height="{Binding SeekBarContainerHeight}"
+                                  Visibility="{Binding IsAnimatorModeEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Top" Value="{Binding DataContext.MarkerVerticalOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                                <Setter Property="Canvas.Left">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource PercentToCanvasLeftConverter}">
+                                            <Binding Path="Percent" />
+                                            <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <!-- Clic izquierdo = saltar a la marca; clic derecho = editar/eliminar.
+                                     Evita a proposito la ambiguedad clic-simple-vs-doble-clic de WPF. -->
+                                <!-- InitialShowDelay: WPF espera 400ms por defecto antes de mostrar
+                                     cualquier tooltip; para revisar etiquetas al vuelo eso se siente
+                                     lento, asi que se baja casi a cero.
+                                     ShowDuration: por defecto el tooltip se auto-oculta a los 5s, muy
+                                     poco para leer una nota larga; se extiende a un minuto. -->
+                                <Button Style="{StaticResource PlainButtonStyle}" Width="12" Height="14" Cursor="Hand"
+                                        Margin="-6,0,0,0"
+                                        ToolTipService.InitialShowDelay="100"
+                                        ToolTipService.ShowDuration="60000"
+                                        Command="{Binding DataContext.JumpToMarkerCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                    <Button.ToolTip>
+                                        <ToolTip MaxWidth="320">
+                                            <!-- RichTextBox.Document NO es una DependencyProperty (FlowDocument
+                                                 tiene semantica de "un solo dueno"): bindearla directo tira
+                                                 "A 'Binding' cannot be set on the 'Document' property...". Se
+                                                 usa la propiedad adjunta de RichTextBoxHelper como puente. -->
+                                            <RichTextBox IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                         Foreground="{StaticResource TextPrimaryBrush}" IsDocumentEnabled="True"
+                                                         helpers:RichTextBoxHelper.BoundDocument="{Binding RenderedDocument, Mode=OneWay}" />
+                                        </ToolTip>
+                                    </Button.ToolTip>
+                                    <Button.ContextMenu>
+                                        <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
+                                            <MenuItem Header="{loc:Tr Marker_Edit}" Style="{StaticResource DarkMenuItemStyle}"
+                                                      Command="{Binding PlacementTarget.Tag.EditMarkerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                            <MenuItem Header="{loc:Tr Marker_Delete}" Style="{StaticResource DarkMenuItemStyle}"
+                                                      Command="{Binding PlacementTarget.Tag.DeleteMarkerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                    <Path Data="M6,0 L12,7 L6,14 L0,7 Z" Fill="{StaticResource AccentBrush}"
+                                          Stroke="Black" StrokeThickness="0.75" Stretch="Uniform" />
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </Grid>
 
                 <!-- Controles -->
