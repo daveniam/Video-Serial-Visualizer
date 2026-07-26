@@ -163,35 +163,9 @@
                 </Style.Triggers>
             </Style>
 
-            <Style x:Key="ThinSeekSliderStyle" TargetType="Slider">
-                <Setter Property="Background" Value="Transparent" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Slider">
-                            <Grid Background="Transparent" VerticalAlignment="Center">
-                                <Track x:Name="PART_Track">
-                                    <Track.DecreaseRepeatButton>
-                                        <RepeatButton Command="Slider.DecreaseLarge" Background="Transparent" BorderThickness="0" Opacity="0" />
-                                    </Track.DecreaseRepeatButton>
-                                    <Track.IncreaseRepeatButton>
-                                        <RepeatButton Command="Slider.IncreaseLarge" Background="Transparent" BorderThickness="0" Opacity="0" />
-                                    </Track.IncreaseRepeatButton>
-                                    <Track.Thumb>
-                                        <Thumb Width="13" Height="13">
-                                            <Thumb.Template>
-                                                <ControlTemplate TargetType="Thumb">
-                                                    <Ellipse Fill="{StaticResource SeekPlayedBrush}" />
-                                                </ControlTemplate>
-                                            </Thumb.Template>
-                                        </Thumb>
-                                    </Track.Thumb>
-                                </Track>
-                            </Grid>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
+            <!-- ThinVolumeSliderStyle: lo usa el slider de opacidad de la ventana de referencia.
+                 Las barras de progreso y volumen del reproductor ya NO usan Slider: pasaron a la
+                 capa interactiva ScrubBar (ver Helpers/ScrubBar.cs), mucho mas confiable. -->
             <Style x:Key="ThinVolumeSliderStyle" TargetType="Slider">
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Template">

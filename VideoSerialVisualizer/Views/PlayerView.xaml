@@ -113,6 +113,18 @@
                                    Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"
                                    Margin="8,0,0,0" Visibility="{Binding IsFrameStepActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+                        <!-- Sin este aviso, los botones de arriba aparecen apagados sin motivo
+                             visible y parece que la aplicacion esta fallando. -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0"
+                                    ToolTip="{loc:Tr Player_FrameStepUnavailableHint}"
+                                    Visibility="{Binding IsFrameStepUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="&#9888;" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="{loc:Tr Player_FrameStepUnavailable}" Margin="5,0,0,0"
+                                       FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                        </StackPanel>
+
                         <Border Width="1" Height="20" Background="{StaticResource BorderSubtleBrush}" Margin="8,0" />
 
                         <!-- Bucle: repite el segmento marcado, o el video completo si no hay segmento. -->
@@ -250,9 +262,25 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Slider x:Name="SeekSlider" Style="{StaticResource ThinSeekSliderStyle}" VerticalAlignment="Center"
-                            Minimum="0" Maximum="{Binding DurationMs}" Value="{Binding PositionMs, Mode=TwoWay}"
-                            IsMoveToPointEnabled="True" />
+                    <!-- Perilla (dot) en la cabeza de reproduccion: se ubica en el borde del relleno
+                         repartiendo el ancho igual que la barra. No intercepta clics. -->
+                    <Grid VerticalAlignment="Center" Height="{Binding SeekBarTrackHeight}" IsHitTestVisible="False">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}}" />
+                            <ColumnDefinition Width="{Binding ProgressPercent, Converter={StaticResource PercentToGridLengthConverter}, ConverterParameter=Inverse}" />
+                        </Grid.ColumnDefinitions>
+                        <Ellipse Grid.Column="0" Width="13" Height="13" Fill="{StaticResource SeekPlayedBrush}"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-6,0" />
+                    </Grid>
+
+                    <!-- Capa interactiva de arrastre: reemplaza al Slider de WPF. Cubre toda la barra,
+                         calcula el punto por la X del cursor (clic = salto exacto, arrastre = seek en
+                         vivo). Va antes de los marcadores para que ellos queden arriba y reciban su clic. -->
+                    <Border Background="Transparent" Cursor="Hand"
+                            helpers:ScrubBar.IsEnabled="True"
+                            helpers:ScrubBar.BeginCommand="{Binding ScrubBeginCommand}"
+                            helpers:ScrubBar.UpdateCommand="{Binding ScrubUpdateCommand}"
+                            helpers:ScrubBar.EndCommand="{Binding ScrubEndCommand}" />
 
                     <!-- Etiquetas de linea de tiempo (modo animador): un rombo en la posicion exacta
                          de cada marca, con vista previa Markdown al pasar el mouse. Van DESPUES del
@@ -374,7 +402,10 @@
                         </Viewbox>
                     </Button>
 
-                    <Grid Grid.Column="4" Width="80" Height="20" VerticalAlignment="Center" Margin="2,0,0,0">
+                    <!-- ClipToBounds: la perilla (dot) al 100% queda justo en el borde; el recorte
+                         evita que sobresalga hacia el boton de al lado. -->
+                    <Grid Grid.Column="4" Width="80" Height="20" VerticalAlignment="Center" Margin="2,0,0,0"
+                          ClipToBounds="True">
                         <Grid VerticalAlignment="Center" Height="4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="{Binding Volume, Converter={StaticResource PercentToGridLengthConverter}}" />
@@ -383,9 +414,22 @@
                             <Rectangle Grid.Column="0" Fill="{StaticResource AccentBrush}" RadiusX="2" RadiusY="2" />
                             <Rectangle Grid.Column="1" Fill="{StaticResource SeekTrackBrush}" RadiusX="2" RadiusY="2" />
                         </Grid>
-                        <Slider Style="{StaticResource ThinVolumeSliderStyle}" VerticalAlignment="Center"
-                                Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}"
-                                IsMoveToPointEnabled="True" ToolTip="{loc:Tr Player_Volume}" />
+
+                        <!-- Perilla del volumen en el borde del relleno. Sin margen negativo: se apoya
+                             contra el borde para no desbordar; el recorte del contenedor la contiene. -->
+                        <Grid VerticalAlignment="Center" Height="11" IsHitTestVisible="False">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding Volume, Converter={StaticResource PercentToGridLengthConverter}}" />
+                                <ColumnDefinition Width="{Binding Volume, Converter={StaticResource PercentToGridLengthConverter}, ConverterParameter=Inverse}" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Grid.Column="1" Width="11" Height="11" Fill="{StaticResource AccentBrush}"
+                                     HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-5.5,0,0,0" />
+                        </Grid>
+
+                        <!-- Capa interactiva: reemplaza al Slider (mismo motivo que la barra de progreso). -->
+                        <Border Background="Transparent" Cursor="Hand" ToolTip="{loc:Tr Player_Volume}"
+                                helpers:ScrubBar.IsEnabled="True"
+                                helpers:ScrubBar.UpdateCommand="{Binding SetVolumeFractionCommand}" />
                     </Grid>
 
                     <Button Grid.Column="5" Style="{StaticResource PlayerIconButtonStyle}" Command="{Binding ToggleSubtitlesCommand}"

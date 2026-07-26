@@ -26,11 +26,6 @@ public partial class PlayerView : UserControl
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
-
-        SeekSlider.PreviewMouseLeftButtonDown += SeekSlider_PreviewMouseLeftButtonDown;
-        SeekSlider.PreviewMouseLeftButtonUp += SeekSlider_PreviewMouseLeftButtonUp;
-        SeekSlider.PreviewKeyDown += SeekSlider_PreviewKeyDown;
-        SeekSlider.PreviewKeyUp += SeekSlider_PreviewKeyUp;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -77,27 +72,4 @@ public partial class PlayerView : UserControl
         Keyboard.Focus(this);
     }
 
-    private void SeekSlider_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (DataContext is PlayerViewModel vm)
-            vm.BeginUserSeek();
-    }
-
-    private void SeekSlider_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        if (DataContext is PlayerViewModel vm)
-            vm.EndUserSeek(SeekSlider.Value);
-    }
-
-    private void SeekSlider_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (DataContext is PlayerViewModel vm)
-            vm.BeginUserSeek();
-    }
-
-    private void SeekSlider_PreviewKeyUp(object sender, KeyEventArgs e)
-    {
-        if (DataContext is PlayerViewModel vm)
-            vm.EndUserSeek(SeekSlider.Value);
-    }
 }

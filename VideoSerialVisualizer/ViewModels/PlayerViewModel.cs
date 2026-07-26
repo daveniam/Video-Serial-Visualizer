@@ -34,6 +34,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private Media? _media;
     private bool _hasAppliedSavedPosition;
     private bool _isSeekingFromUser;
+    private long _lastScrubSeekTick;
     private bool _hasLoadedSubtitleTracks;
     private bool _isSyncingSubtitleSelection;
     private IntPtr _videoHwnd;
@@ -67,9 +68,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     // asentarse en el lugar correcto. Se resuelve ignorando los TimeChanged que reporten una
     // posicion lejos del destino recien pedido, hasta que converjan o venza un margen de seguridad.
 
-    /// <summary>Margen (ms): un TimeChanged dentro de esta distancia del ultimo seek pedido se
-    /// considera "ya reflejando el seek", no un rezago de la posicion anterior.</summary>
-    private const double SeekSettleToleranceMs = 400;
+    /// <summary>Margen (ms): un TimeChanged se acepta como "ya reflejando el seek" cuando NO esta
+    /// mas de esto por detras del destino. Chico a proposito: si fuera grande, se enancharia la
+    /// perilla al keyframe anterior (unos cientos de ms atras) y se veria el rebote. Con un margen
+    /// chico, cualquier reporte por detras se ignora y la perilla queda fija donde se la dejo.</summary>
+    private const double SeekSettleToleranceMs = 60;
 
     /// <summary>Tope de tiempo por si el seek nunca cae lo bastante cerca del valor pedido (poco
     /// frecuente, pero posible segun el codec/los keyframes): pasado esto se deja de ignorar
@@ -564,8 +567,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         _frameStepCacheBytes = 0;
         _frameStepGeneration++;
         NotifyFrameTickPropertiesChanged();
-        StepFrameForwardCommand.NotifyCanExecuteChanged();
-        StepFrameBackwardCommand.NotifyCanExecuteChanged();
+        NotifyFrameStepAvailabilityChanged();
 
         // Un seek pendiente del video anterior no tiene sentido para el nuevo (su propia secuencia
         // de TimeChanged arranca de cero).
@@ -614,8 +616,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             // y los botones de paso a cuadro no aparecen con retraso.
             await Task.Run(EnsureFrameStepFileOpen);
             NotifyFrameTickPropertiesChanged();
-            StepFrameForwardCommand.NotifyCanExecuteChanged();
-            StepFrameBackwardCommand.NotifyCanExecuteChanged();
+            NotifyFrameStepAvailabilityChanged();
 
             AttachFrameRenderer();
         }
@@ -764,13 +765,15 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             if (_isSeekingFromUser)
                 return;
 
-            // Mientras VLC todavia esta aplicando un seek reciente (ver BeginSeekSettleWindow),
-            // puede seguir reportando la posicion ANTERIOR durante un rato: se ignora hasta que
-            // converja con el destino pedido, o venza el margen de seguridad.
-            if (_pendingSeekTargetMs.HasValue)
+            // Tras un seek, VLC salta al keyframe ANTERIOR al punto pedido, asi que reporta por un
+            // instante una posicion detras de donde el usuario solto la perilla. Se mantiene la
+            // perilla FIJA en el destino y se ignoran esos reportes rezagados; se vuelve a seguir la
+            // posicion recien cuando la reproduccion realmente alcanza o pasa el destino (o vence el
+            // margen de seguridad). En pausa no llegan mas TimeChanged, asi que la perilla queda
+            // exactamente donde se la dejo, sin rebote.
+            if (_pendingSeekTargetMs is double seekTarget)
             {
-                if (Math.Abs(e.Time - _pendingSeekTargetMs.Value) > SeekSettleToleranceMs
-                    && DateTime.UtcNow < _pendingSeekDeadlineUtc)
+                if (e.Time < seekTarget - SeekSettleToleranceMs && DateTime.UtcNow < _pendingSeekDeadlineUtc)
                     return;
 
                 _pendingSeekTargetMs = null;
@@ -1358,26 +1361,81 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     /// </summary>
     private bool CanStepFrame() => IsAnimatorModeEnabled && _frameStepFile is not null && _frameStepFps > 0;
 
+    /// <summary>
+    /// Hay un video abierto en modo animador pero FFmpeg no pudo leerlo, asi que no hay paso a
+    /// cuadro ni marcas de cuadro para el. El video igual se reproduce (de eso se encarga VLC, que
+    /// trae su propio juego de codecs). Se expone para poder decirlo en pantalla: sin aviso, los
+    /// botones aparecen apagados sin motivo visible y parece un error de la aplicacion.
+    /// </summary>
+    public bool IsFrameStepUnavailable => IsAnimatorModeEnabled && CurrentVideo is not null && !CanStepFrame();
+
+    /// <summary>Refresca todo lo que depende de si el paso a cuadro esta disponible.</summary>
+    private void NotifyFrameStepAvailabilityChanged()
+    {
+        StepFrameForwardCommand.NotifyCanExecuteChanged();
+        StepFrameBackwardCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(IsFrameStepUnavailable));
+    }
+
     [RelayCommand(CanExecute = nameof(CanStepFrame))]
     private async Task StepFrameForwardAsync() => await StepFrameAsync(1);
 
     [RelayCommand(CanExecute = nameof(CanStepFrame))]
     private async Task StepFrameBackwardAsync() => await StepFrameAsync(-1);
 
-    public void BeginUserSeek()
+    // Cada cuanto (ms) se reenvia el seek a VLC mientras se arrastra la barra. Actualizar la perilla
+    // es instantaneo, pero pedirle a VLC que decodifique el cuadro cuesta: reenviarlo en cada
+    // MouseMove lo saturaria. ~60 ms (~16 Hz) alcanza para ver el video moverse con fluidez.
+    private const long ScrubSeekThrottleMs = 60;
+
+    /// <summary>Inicio del arrastre de la barra de progreso (ScrubBar en la vista).</summary>
+    [RelayCommand]
+    private void ScrubBegin()
     {
         _isSeekingFromUser = true;
+        _lastScrubSeekTick = 0;
 
-        // Arrastrar la barra es un gesto de "buscar", no de revisar cuadro a cuadro: se sale del
-        // modo paso a cuadro y el arrastre se comporta como siempre (seek normal de VLC).
+        // Arrastrar la barra es "buscar", no revisar cuadro a cuadro: se sale del modo paso a cuadro.
         if (IsFrameStepActive)
             ExitFrameStep();
     }
 
-    public void EndUserSeek(double newPositionMs)
+    /// <summary>
+    /// Arrastre en curso: <paramref name="fraction"/> es 0..1 sobre el ancho de la barra. La perilla
+    /// y el tiempo se actualizan al instante; el cuadro del video se refresca de forma limitada
+    /// (throttle) para que se vea el cambio sin saturar a VLC.
+    /// </summary>
+    [RelayCommand]
+    private void ScrubUpdate(double fraction)
+    {
+        if (DurationMs <= 0)
+            return;
+
+        var target = Math.Clamp(fraction, 0, 1) * DurationMs;
+        PositionMs = target;
+        CurrentTimeText = FormatTime(target);
+
+        var now = Environment.TickCount64;
+        if (now - _lastScrubSeekTick >= ScrubSeekThrottleMs)
+        {
+            _lastScrubSeekTick = now;
+            MediaPlayer.Time = (long)target;
+        }
+    }
+
+    /// <summary>Fin del arrastre: seek exacto al punto final y ventana de asentamiento.</summary>
+    [RelayCommand]
+    private void ScrubEnd(double fraction)
     {
         _isSeekingFromUser = false;
-        SeekTo(newPositionMs);
+        SeekTo(Math.Clamp(fraction, 0, 1) * DurationMs);
+    }
+
+    /// <summary>Fija el volumen segun la fraccion 0..1 de la barra de volumen (ScrubBar en la vista).</summary>
+    [RelayCommand]
+    private void SetVolumeFraction(double fraction)
+    {
+        Volume = (int)Math.Round(Math.Clamp(fraction, 0, 1) * 100);
     }
 
     /// <summary>Salta a una posicion puntual (p.ej. clic en un marcador de la linea de tiempo): sale
