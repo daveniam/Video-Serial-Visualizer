@@ -22,6 +22,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private object? currentViewModel;
 
+    /// <summary>El sello de version (esquina inferior derecha) se oculta en el reproductor: alli esa
+    /// zona la ocupa la barra de controles y el sello quedaria encima.</summary>
+    public bool IsVersionBadgeVisible => CurrentViewModel is not global::VideoSerialVisualizer.ViewModels.PlayerViewModel;
+
+    partial void OnCurrentViewModelChanged(object? value) => OnPropertyChanged(nameof(IsVersionBadgeVisible));
+
     [ObservableProperty]
     private bool isLoading = true;
 

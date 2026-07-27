@@ -37,6 +37,8 @@
   "Player_StepFrameBack": "Vorheriges Einzelbild (,  oder Strg+Links)",
   "Player_StepFrameForward": "Nächstes Einzelbild (.  oder Strg+Rechts)",
   "Player_FrameNumberFormat": "Bild {0}",
+  "Player_FrameStepUnavailable": "Einzelbildschaltung für diese Datei nicht verfügbar",
+  "Player_FrameStepUnavailableHint": "Das Format dieser Datei konnte für die exakte Einzelbildschaltung nicht gelesen werden, daher sind die Einzelbild-Bedienelemente und die Bildmarkierungen auf der Leiste nicht verfügbar. Die Wiedergabe ist nicht betroffen: Der Rest des Players funktioniert normal.",
   "Player_Loop": "Schleife",
   "Player_SetSegmentStart": "Segmentanfang markieren",
   "Player_SetSegmentEnd": "Segmentende markieren",

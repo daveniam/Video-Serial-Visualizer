@@ -37,6 +37,8 @@
   "Player_StepFrameBack": "Previous frame (,  or Ctrl+Left)",
   "Player_StepFrameForward": "Next frame (.  or Ctrl+Right)",
   "Player_FrameNumberFormat": "Frame {0}",
+  "Player_FrameStepUnavailable": "Frame stepping unavailable for this file",
+  "Player_FrameStepUnavailableHint": "This file's format could not be read for exact frame stepping, so the frame controls and the frame marks on the bar are not available. Playback is unaffected: the rest of the player works normally.",
   "Player_Loop": "Loop",
   "Player_SetSegmentStart": "Mark segment start",
   "Player_SetSegmentEnd": "Mark segment end",

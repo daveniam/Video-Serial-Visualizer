@@ -37,6 +37,8 @@
   "Player_StepFrameBack": "上一帧（, 或 Ctrl+左）",
   "Player_StepFrameForward": "下一帧（. 或 Ctrl+右）",
   "Player_FrameNumberFormat": "第 {0} 帧",
+  "Player_FrameStepUnavailable": "此文件不支持逐帧步进",
+  "Player_FrameStepUnavailableHint": "无法读取此文件的格式以进行精确逐帧步进，因此逐帧控件和进度条上的帧标记不可用。播放不受影响：播放器的其余功能正常工作。",
   "Player_Loop": "循环",
   "Player_SetSegmentStart": "标记片段起点",
   "Player_SetSegmentEnd": "标记片段终点",

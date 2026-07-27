@@ -33,6 +33,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     private Media? _media;
     private bool _hasAppliedSavedPosition;
+    private bool _playbackStarted;
     private bool _isSeekingFromUser;
     private long _lastScrubSeekTick;
     private bool _hasLoadedSubtitleTracks;
@@ -368,11 +369,26 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     /// <summary>El cuadro congelado del paso a cuadro se muestra en la ventana principal.</summary>
     public bool IsFrameStepVisibleInMain => IsFrameStepActive && !IsReferenceWindowOpen;
 
+    /// <summary>La ventana principal esta activa. Cuando no lo esta, el overlay de play se oculta para
+    /// que no quede flotando por encima de otras aplicaciones (el Popup vive en su propia ventana).</summary>
+    [ObservableProperty]
+    private bool isWindowActive = true;
+
+    /// <summary>
+    /// Boton de play grande al centro del video (estilo YouTube), visible solo con el video pausado.
+    /// Se excluye el paso a cuadro (ya tiene su cuadro congelado) y la ventana de referencia (el
+    /// video se muestra alla).
+    /// </summary>
+    public bool IsPlayOverlayVisible =>
+        CurrentVideo is not null && _playbackStarted && !IsPlaying
+        && !IsFrameStepActive && !IsReferenceWindowOpen && IsWindowActive;
+
     private void NotifyVideoSurfaceVisibilityChanged()
     {
         OnPropertyChanged(nameof(IsNativeVideoVisible));
         OnPropertyChanged(nameof(IsCallbackVideoVisible));
         OnPropertyChanged(nameof(IsFrameStepVisibleInMain));
+        OnPropertyChanged(nameof(IsPlayOverlayVisible));
     }
 
     partial void OnIsCallbackRenderingActiveChanged(bool value) => NotifyVideoSurfaceVisibilityChanged();
@@ -380,6 +396,12 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     partial void OnIsFrameStepActiveChanged(bool value) => NotifyVideoSurfaceVisibilityChanged();
 
     partial void OnIsReferenceWindowOpenChanged(bool value) => NotifyVideoSurfaceVisibilityChanged();
+
+    partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
+
+    partial void OnCurrentVideoChanged(Video? value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
+
+    partial void OnIsWindowActiveChanged(bool value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
 
     /// <summary>Texto "Cuadro N" localizado; vacio si no hay numero de cuadro conocido todavia.</summary>
     public string FrameNumberText => CurrentFrameNumber.HasValue
@@ -539,6 +561,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
         CurrentVideo = video;
 
+        // El overlay de play no debe verse durante la carga (aun no arranco): se habilita recien
+        // con el primer evento Playing (ver OnPlaying). Evita un parpadeo al abrir cada video.
+        _playbackStarted = false;
+        OnPropertyChanged(nameof(IsPlayOverlayVisible));
+
         HasNextVideo = GetNextVideo() is not null;
         HasPreviousVideo = GetPreviousVideo() is not null;
         IsNextFillVisible = false;
@@ -687,6 +714,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         App.Current.Dispatcher.BeginInvoke(() =>
         {
             IsPlaying = true;
+            _playbackStarted = true;
 
             if (!_hasAppliedSavedPosition)
             {

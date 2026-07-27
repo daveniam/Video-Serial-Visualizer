@@ -37,6 +37,8 @@
   "Player_StepFrameBack": "Image précédente (,  ou Ctrl+Gauche)",
   "Player_StepFrameForward": "Image suivante (.  ou Ctrl+Droite)",
   "Player_FrameNumberFormat": "Image {0}",
+  "Player_FrameStepUnavailable": "Avance image par image indisponible pour ce fichier",
+  "Player_FrameStepUnavailableHint": "Le format de ce fichier n'a pas pu être lu pour l'avance image par image exacte : les commandes d'image et les repères sur la barre ne sont donc pas disponibles. La lecture n'est pas affectée : le reste du lecteur fonctionne normalement.",
   "Player_Loop": "Boucle",
   "Player_SetSegmentStart": "Marquer le début du segment",
   "Player_SetSegmentEnd": "Marquer la fin du segment",

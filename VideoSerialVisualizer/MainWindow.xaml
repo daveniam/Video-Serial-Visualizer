@@ -10,6 +10,17 @@
     <Grid>
         <ContentControl Content="{Binding CurrentViewModel}" />
 
+        <!-- Sello de version, siempre presente de forma discreta en la esquina inferior derecha.
+             No intercepta clics (IsHitTestVisible=False) y se atenua para no competir con el
+             contenido. Se oculta en el reproductor (ver IsVersionBadgeVisible): esa esquina la
+             ocupa la barra de controles. El texto lo pone MainWindow.xaml.cs desde la version del
+             ensamblado, para no duplicar el numero. -->
+        <TextBlock x:Name="VersionBadge" IsHitTestVisible="False"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,12,8"
+                   Foreground="{StaticResource TextSecondaryBrush}" Opacity="0.4"
+                   FontSize="11"
+                   Visibility="{Binding IsVersionBadgeVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
         <Border Background="{StaticResource BgPrimaryBrush}"
                 Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">

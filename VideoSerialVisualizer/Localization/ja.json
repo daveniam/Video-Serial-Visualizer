@@ -37,6 +37,8 @@
   "Player_StepFrameBack": "前のフレーム（, または Ctrl+左）",
   "Player_StepFrameForward": "次のフレーム（. または Ctrl+右）",
   "Player_FrameNumberFormat": "フレーム {0}",
+  "Player_FrameStepUnavailable": "このファイルではコマ送りを利用できません",
+  "Player_FrameStepUnavailableHint": "正確なコマ送りのためにこのファイルの形式を読み取れなかったため、コマ送りの操作とバー上のフレーム目盛りは利用できません。再生には影響しません：プレーヤーのその他の機能は通常どおり動作します。",
   "Player_Loop": "ループ",
   "Player_SetSegmentStart": "セグメントの開始をマーク",
   "Player_SetSegmentEnd": "セグメントの終了をマーク",

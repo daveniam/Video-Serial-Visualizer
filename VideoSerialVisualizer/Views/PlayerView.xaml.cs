@@ -28,12 +28,25 @@ public partial class PlayerView : UserControl
         Unloaded += OnUnloaded;
     }
 
+    private Window? _hostWindow;
+
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         // Acceder a Handle fuerza la creacion de la ventana nativa; se la pasamos al MediaPlayer
         // ANTES de reproducir (MainViewModel espera a este Loaded), asi LibVLC pinta aca dentro.
         if (DataContext is PlayerViewModel vm)
             vm.AttachVideoSurface(_videoPanel.Handle);
+
+        // Se sigue si la ventana esta activa: el overlay de play (Popup) se oculta cuando no lo
+        // esta, para que no quede flotando encima de otras aplicaciones.
+        _hostWindow = Window.GetWindow(this);
+        if (_hostWindow is not null)
+        {
+            _hostWindow.Activated += OnHostWindowActivated;
+            _hostWindow.Deactivated += OnHostWindowDeactivated;
+            if (DataContext is PlayerViewModel v)
+                v.IsWindowActive = _hostWindow.IsActive;
+        }
 
         // Los atajos de teclado (KeyBinding, ver PlayerView.xaml) solo disparan mientras el foco de
         // teclado de WPF esta en este control o un descendiente WPF. Se reclama apenas se carga la
@@ -45,6 +58,25 @@ public partial class PlayerView : UserControl
     {
         if (DataContext is PlayerViewModel vm)
             vm.DetachVideoSurface();
+
+        if (_hostWindow is not null)
+        {
+            _hostWindow.Activated -= OnHostWindowActivated;
+            _hostWindow.Deactivated -= OnHostWindowDeactivated;
+            _hostWindow = null;
+        }
+    }
+
+    private void OnHostWindowActivated(object? sender, EventArgs e)
+    {
+        if (DataContext is PlayerViewModel vm)
+            vm.IsWindowActive = true;
+    }
+
+    private void OnHostWindowDeactivated(object? sender, EventArgs e)
+    {
+        if (DataContext is PlayerViewModel vm)
+            vm.IsWindowActive = false;
     }
 
     // El clic llega desde el hilo de mensajes del panel nativo; se marshalea al hilo de UI.

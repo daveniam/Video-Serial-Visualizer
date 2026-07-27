@@ -54,7 +54,7 @@
                2. Imagen WPF en vivo (render por callbacks): en modo animador, para que el video sea
                   contenido WPF y pueda transparentarse / llevarse a la ventana flotante.
                3. Imagen WPF del cuadro exacto de FFmpeg: mientras se revisa cuadro a cuadro. -->
-        <Grid Grid.Row="1" Background="Black">
+        <Grid Grid.Row="1" x:Name="VideoArea" Background="Black">
             <wfi:WindowsFormsHost x:Name="VideoHost" Background="Black"
                                    Visibility="{Binding IsNativeVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
@@ -85,6 +85,26 @@
                            Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
                            HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" />
             </StackPanel>
+
+            <!-- Boton de play grande al centro (estilo YouTube) cuando el video esta pausado.
+                 Va en un Popup a proposito: el video normal se dibuja en una ventana NATIVA (ver
+                 arriba, "airspace problem") que taparia cualquier control WPF superpuesto. El Popup
+                 se renderiza en su propia ventana por encima, asi que aparece sobre el video en
+                 cualquiera de los tres modos de dibujo. Placement=Center lo centra sobre el video. -->
+            <Popup PlacementTarget="{Binding ElementName=VideoArea}" Placement="Center"
+                   AllowsTransparency="True" StaysOpen="True"
+                   IsOpen="{Binding IsPlayOverlayVisible, Mode=OneWay}">
+                <Button Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayPauseCommand}"
+                        ToolTip="{loc:Tr Player_PlayPause}" Width="72" Height="72">
+                    <Grid>
+                        <Ellipse Fill="#B0000000" />
+                        <Ellipse Stroke="#40FFFFFF" StrokeThickness="1" />
+                        <!-- Triangulo de play, apenas corrido a la derecha para verse centrado. -->
+                        <Path Data="M 0,0 L 22,13 L 0,26 Z" Fill="White"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0" />
+                    </Grid>
+                </Button>
+            </Popup>
         </Grid>
 
         <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" Padding="16,10,16,10">

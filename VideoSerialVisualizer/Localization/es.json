@@ -37,6 +37,8 @@
   "Player_StepFrameBack": "Cuadro anterior (,  o Ctrl+Izquierda)",
   "Player_StepFrameForward": "Cuadro siguiente (.  o Ctrl+Derecha)",
   "Player_FrameNumberFormat": "Cuadro {0}",
+  "Player_FrameStepUnavailable": "Paso a cuadro no disponible para este archivo",
+  "Player_FrameStepUnavailableHint": "No se pudo leer el formato de este archivo para el paso a cuadro exacto, así que los controles de cuadro y las marcas de la barra no están disponibles. La reproducción no se ve afectada: el resto del reproductor funciona normalmente.",
   "Player_Loop": "Bucle",
   "Player_SetSegmentStart": "Marcar inicio de segmento",
   "Player_SetSegmentEnd": "Marcar fin de segmento",

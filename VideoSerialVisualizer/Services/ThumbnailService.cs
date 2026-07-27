@@ -15,10 +15,18 @@ namespace VideoSerialVisualizer.Services;
 /// </summary>
 public class ThumbnailService
 {
-    private const int SnapshotTimeoutMs = 6000;
-    private const int SeekSettleDelayMs = 400;
+    // Tiempo maximo esperando a que el video llegue a "Playing". Antes eran 6s: corto para archivos
+    // grandes o largos (tutoriales de horas), que tardan mas en abrir y era la causa de que segmentos
+    // enteros se quedaran sin miniatura.
+    private const int SnapshotTimeoutMs = 12000;
+    private const int SeekSettleDelayMs = 500;
     private const int FileWritePollIntervalMs = 100;
-    private const int FileWriteTimeoutMs = 2000;
+    private const int FileWriteTimeoutMs = 2500;
+
+    // Posiciones (fraccion de la duracion) donde se intenta capturar, en orden. Si una falla se
+    // prueba la siguiente: en algunos videos el punto elegido cae en una transicion o un tramo que
+    // el decoder no resuelve bien, pero otro punto si.
+    private static readonly double[] SnapshotPositions = { 0.5, 0.35, 0.65, 0.2 };
 
     private readonly LibVLC _libVlc;
     private readonly IntPtr _hiddenRenderWindow;
@@ -42,22 +50,29 @@ public class ThumbnailService
         _hiddenRenderWindow = CreateHiddenWindow();
     }
 
-    public async Task<string?> GenerateThumbnailAsync(int videoId, string videoPath, long durationMs)
+    /// <summary>Resultado de generar una miniatura: la ruta (o null si fallo) y la duracion real
+    /// observada del video. La duracion se lee del reproductor, no de Media.Parse, porque este
+    /// ultimo devuelve 0 en varios MP4 (indice al final del archivo), y ese 0 rompia la barra de
+    /// progreso y el calculo del punto de captura.</summary>
+    public readonly record struct ThumbnailResult(string? ThumbnailPath, long DurationMs);
+
+    public async Task<ThumbnailResult> GenerateThumbnailAsync(int videoId, string videoPath)
     {
         var outputPath = Path.Combine(ThumbnailDirectory, $"{videoId}.jpg");
 
         try
         {
-            return await CaptureFrameAsync(videoPath, durationMs, outputPath) ? outputPath : null;
+            var (ok, durationMs) = await CaptureFrameAsync(videoPath, outputPath);
+            return new ThumbnailResult(ok ? outputPath : null, durationMs);
         }
         catch
         {
             TryDeleteFile(outputPath);
-            return null;
+            return new ThumbnailResult(null, 0);
         }
     }
 
-    private async Task<bool> CaptureFrameAsync(string videoPath, long durationMs, string outputPath)
+    private async Task<(bool Ok, long DurationMs)> CaptureFrameAsync(string videoPath, string outputPath)
     {
         using var media = new Media(_libVlc, new Uri(videoPath));
         using var mediaPlayer = new MediaPlayer(_libVlc) { Volume = 0 };
@@ -84,32 +99,40 @@ public class ThumbnailService
             var readyTask = await Task.WhenAny(playingTcs.Task, errorTcs.Task, timeoutTask);
 
             if (readyTask != playingTcs.Task)
-                return false;
+                return (false, 0);
 
-            if (durationMs > 0)
+            // La duracion se lee del reproductor ya en marcha: es la fuente confiable. Length puede
+            // tardar un instante en poblarse tras el evento Playing, asi que se sondea un momento.
+            var durationMs = mediaPlayer.Length;
+            var lengthWait = 0;
+            while (durationMs <= 0 && lengthWait < 1000)
             {
-                mediaPlayer.Time = (long)(durationMs * 0.75);
+                await Task.Delay(100);
+                durationMs = mediaPlayer.Length;
+                lengthWait += 100;
+            }
+            if (durationMs < 0)
+                durationMs = 0;
+
+            // Si aun asi no se conoce la duracion no se puede seekear a una fraccion: se captura
+            // donde este (el arranque).
+            if (durationMs <= 0)
+            {
                 await Task.Delay(SeekSettleDelayMs);
+                return (await TrySnapshotAsync(mediaPlayer, outputPath), 0);
             }
-            else
+
+            // Se prueban varias posiciones hasta que una produzca un archivo valido.
+            foreach (var position in SnapshotPositions)
             {
+                mediaPlayer.Time = (long)(durationMs * position);
                 await Task.Delay(SeekSettleDelayMs);
+
+                if (await TrySnapshotAsync(mediaPlayer, outputPath))
+                    return (true, durationMs);
             }
 
-            if (!mediaPlayer.TakeSnapshot(0, outputPath, 0, 0))
-                return false;
-
-            var waited = 0;
-            while (waited < FileWriteTimeoutMs)
-            {
-                if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
-                    return true;
-
-                await Task.Delay(FileWritePollIntervalMs);
-                waited += FileWritePollIntervalMs;
-            }
-
-            return false;
+            return (false, durationMs);
         }
         finally
         {
@@ -117,6 +140,25 @@ public class ThumbnailService
             mediaPlayer.EncounteredError -= onError;
             mediaPlayer.Stop();
         }
+    }
+
+    /// <summary>Toma un snapshot y espera a que el archivo quede escrito con contenido.</summary>
+    private static async Task<bool> TrySnapshotAsync(MediaPlayer mediaPlayer, string outputPath)
+    {
+        if (!mediaPlayer.TakeSnapshot(0, outputPath, 0, 0))
+            return false;
+
+        var waited = 0;
+        while (waited < FileWriteTimeoutMs)
+        {
+            if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
+                return true;
+
+            await Task.Delay(FileWritePollIntervalMs);
+            waited += FileWritePollIntervalMs;
+        }
+
+        return false;
     }
 
     private static void TryDeleteFile(string path)

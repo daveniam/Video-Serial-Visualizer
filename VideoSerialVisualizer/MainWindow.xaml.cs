@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Software libre, sin garantia alguna. Ver LICENSE para los terminos completos.
 
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -21,6 +22,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+
+        // Sello de version discreto (esquina inferior derecha). Se toma del ensamblado para no
+        // duplicar el numero que ya vive en el .csproj.
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        VersionBadge.Text = "v" + (version?.ToString(3) ?? "1.0.0");
         SourceInitialized += (_, _) =>
         {
             EnableDarkTitleBar();
