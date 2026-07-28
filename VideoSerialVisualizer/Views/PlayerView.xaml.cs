@@ -5,6 +5,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using VideoSerialVisualizer.Helpers;
 using VideoSerialVisualizer.ViewModels;
 
@@ -44,6 +45,11 @@ public partial class PlayerView : UserControl
         {
             _hostWindow.Activated += OnHostWindowActivated;
             _hostWindow.Deactivated += OnHostWindowDeactivated;
+            // El overlay de play vive en su propia ventana (Popup): no sigue sola a la principal, hay
+            // que reposicionarla a mano cuando esta se mueve, cambia de tamano o se restaura.
+            _hostWindow.LocationChanged += OnHostWindowMovedOrResized;
+            _hostWindow.SizeChanged += OnHostWindowMovedOrResized;
+            _hostWindow.StateChanged += OnHostWindowMovedOrResized;
             if (DataContext is PlayerViewModel v)
                 v.IsWindowActive = _hostWindow.IsActive;
         }
@@ -63,6 +69,9 @@ public partial class PlayerView : UserControl
         {
             _hostWindow.Activated -= OnHostWindowActivated;
             _hostWindow.Deactivated -= OnHostWindowDeactivated;
+            _hostWindow.LocationChanged -= OnHostWindowMovedOrResized;
+            _hostWindow.SizeChanged -= OnHostWindowMovedOrResized;
+            _hostWindow.StateChanged -= OnHostWindowMovedOrResized;
             _hostWindow = null;
         }
     }
@@ -77,6 +86,29 @@ public partial class PlayerView : UserControl
     {
         if (DataContext is PlayerViewModel vm)
             vm.IsWindowActive = false;
+    }
+
+    private void OnHostWindowMovedOrResized(object? sender, EventArgs e) => RepositionPlayOverlay();
+
+    /// <summary>Fuerza al Popup del overlay a recalcular su posicion respecto del video. WPF no lo
+    /// hace solo cuando la ventana se mueve: se le da un empujoncito al offset (ida y vuelta) para
+    /// que se recoloque centrado sobre el video en su nueva ubicacion.</summary>
+    private void RepositionPlayOverlay()
+    {
+        if (!PlayOverlayPopup.IsOpen)
+            return;
+
+        var offset = PlayOverlayPopup.HorizontalOffset;
+        PlayOverlayPopup.HorizontalOffset = offset + 1;
+        PlayOverlayPopup.HorizontalOffset = offset;
+    }
+
+    /// <summary>Al abrirse el Popup se marca su ventana Win32 como no activable, asi no roba la
+    /// activacion de la ventana principal (evita el pitido y el doble clic al restaurar).</summary>
+    private void PlayOverlayPopup_Opened(object? sender, EventArgs e)
+    {
+        if (PresentationSource.FromVisual(PlayOverlayPopup.Child) is HwndSource source)
+            WindowEffectsHelper.SetNoActivate(source.Handle);
     }
 
     // El clic llega desde el hilo de mensajes del panel nativo; se marshalea al hilo de UI.

@@ -90,9 +90,15 @@
                  Va en un Popup a proposito: el video normal se dibuja en una ventana NATIVA (ver
                  arriba, "airspace problem") que taparia cualquier control WPF superpuesto. El Popup
                  se renderiza en su propia ventana por encima, asi que aparece sobre el video en
-                 cualquiera de los tres modos de dibujo. Placement=Center lo centra sobre el video. -->
-            <Popup PlacementTarget="{Binding ElementName=VideoArea}" Placement="Center"
-                   AllowsTransparency="True" StaysOpen="True"
+                 cualquiera de los tres modos de dibujo. Placement=Center lo centra sobre el video.
+
+                 Como es una ventana top-level aparte, el code-behind (PlayerView.xaml.cs) se encarga
+                 de: reposicionarla cuando la ventana principal se mueve/redimensiona/restaura, y
+                 marcarla WS_EX_NOACTIVATE al abrirse para que no robe la activacion. -->
+            <Popup x:Name="PlayOverlayPopup"
+                   PlacementTarget="{Binding ElementName=VideoArea}" Placement="Center"
+                   AllowsTransparency="True" StaysOpen="True" Focusable="False" PopupAnimation="None"
+                   Opened="PlayOverlayPopup_Opened"
                    IsOpen="{Binding IsPlayOverlayVisible, Mode=OneWay}">
                 <Button Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayPauseCommand}"
                         ToolTip="{loc:Tr Player_PlayPause}" Width="72" Height="72">
