@@ -31,6 +31,12 @@ public static class ScrubBar
     public static readonly DependencyProperty EndCommandProperty = DependencyProperty.RegisterAttached(
         "EndCommand", typeof(ICommand), typeof(ScrubBar));
 
+    /// <summary>Se dispara al presionar el boton derecho, con la fraccion 0..1 del punto. Pensado para
+    /// que un menu contextual sepa a que momento del video apunta el clic. NO marca el evento como
+    /// manejado, asi el ContextMenu del elemento se abre normalmente.</summary>
+    public static readonly DependencyProperty RightDownCommandProperty = DependencyProperty.RegisterAttached(
+        "RightDownCommand", typeof(ICommand), typeof(ScrubBar));
+
     public static readonly DependencyProperty IsEnabledProperty = DependencyProperty.RegisterAttached(
         "IsEnabled", typeof(bool), typeof(ScrubBar), new PropertyMetadata(false, OnIsEnabledChanged));
 
@@ -40,6 +46,8 @@ public static class ScrubBar
     public static ICommand? GetUpdateCommand(DependencyObject o) => (ICommand?)o.GetValue(UpdateCommandProperty);
     public static void SetEndCommand(DependencyObject o, ICommand v) => o.SetValue(EndCommandProperty, v);
     public static ICommand? GetEndCommand(DependencyObject o) => (ICommand?)o.GetValue(EndCommandProperty);
+    public static void SetRightDownCommand(DependencyObject o, ICommand v) => o.SetValue(RightDownCommandProperty, v);
+    public static ICommand? GetRightDownCommand(DependencyObject o) => (ICommand?)o.GetValue(RightDownCommandProperty);
     public static void SetIsEnabled(DependencyObject o, bool v) => o.SetValue(IsEnabledProperty, v);
     public static bool GetIsEnabled(DependencyObject o) => (bool)o.GetValue(IsEnabledProperty);
 
@@ -53,13 +61,23 @@ public static class ScrubBar
             element.MouseLeftButtonDown += OnMouseDown;
             element.MouseMove += OnMouseMove;
             element.MouseLeftButtonUp += OnMouseUp;
+            element.MouseRightButtonDown += OnRightDown;
         }
         else
         {
             element.MouseLeftButtonDown -= OnMouseDown;
             element.MouseMove -= OnMouseMove;
             element.MouseLeftButtonUp -= OnMouseUp;
+            element.MouseRightButtonDown -= OnRightDown;
         }
+    }
+
+    private static void OnRightDown(object sender, MouseButtonEventArgs e)
+    {
+        // Solo se registra el punto; a proposito NO se marca e.Handled para que el ContextMenu del
+        // elemento se abra igual, ya sabiendo a que momento del video apunta el clic.
+        var element = (FrameworkElement)sender;
+        Fire(GetRightDownCommand(element), FractionAt(element, e));
     }
 
     private static void OnMouseDown(object sender, MouseButtonEventArgs e)

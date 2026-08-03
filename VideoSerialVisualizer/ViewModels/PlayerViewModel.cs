@@ -14,6 +14,8 @@ using FFMediaToolkit;
 using FFMediaToolkit.Decoding;
 using FFMediaToolkit.Graphics;
 using LibVLCSharp.Shared;
+using Microsoft.EntityFrameworkCore;
+using VideoSerialVisualizer.Data;
 using VideoSerialVisualizer.Helpers;
 using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Models;
@@ -27,9 +29,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private readonly LibVLC _libVlc;
     private readonly ProgressTrackerService _progressTracker;
     private readonly VideoMarkerService _markerService;
+    private readonly ThumbnailService _thumbnailService;
     private readonly Action _goBack;
     private readonly DispatcherTimer _saveTimer;
     private readonly DispatcherTimer _opacitySaveTimer;
+    private readonly DispatcherTimer _coverFeedbackTimer;
 
     private Media? _media;
     private bool _hasAppliedSavedPosition;
@@ -403,6 +407,108 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     partial void OnIsWindowActiveChanged(bool value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
 
+    // --- Portada del grupo (clic derecho en la barra) ---
+    //
+    // El usuario elige un momento del video con clic derecho sobre la barra y lo fija como caratula
+    // del grupo. El punto (fraccion 0..1) se recuerda al abrir el menu contextual; el item del menu
+    // dispara la captura, que corre en un reproductor oculto aparte para no tocar la reproduccion.
+
+    private double _pendingCoverFraction;
+
+    /// <summary>Aviso breve y no intrusivo tras fijar la portada (capturando / listo / fallo).</summary>
+    [ObservableProperty]
+    private string coverFeedbackText = string.Empty;
+
+    [ObservableProperty]
+    private bool isCoverFeedbackVisible;
+
+    /// <summary>Recuerda el punto del clic derecho sobre la barra, para que el item del menu sepa que
+    /// cuadro capturar.</summary>
+    [RelayCommand]
+    private void RecordCoverPoint(double fraction) => _pendingCoverFraction = Math.Clamp(fraction, 0, 1);
+
+    [RelayCommand]
+    private async Task SetGroupCoverAsync()
+    {
+        var video = CurrentVideo;
+        if (video is null)
+            return;
+
+        var folderPath = video.CarpetaOrigen;
+        var videoPath = video.RutaAbsoluta;
+        var fraction = _pendingCoverFraction;
+
+        ShowCoverFeedback(Loc.I["Cover_Capturing"], autoHide: false);
+
+        string? newCoverPath = null;
+        string? oldCoverPath = null;
+
+        try
+        {
+            await using var db = new AppDbContext();
+
+            var entry = await db.FolderCategories.FirstOrDefaultAsync(f => f.FolderPath == folderPath);
+            if (entry is null)
+            {
+                entry = new FolderCategory { FolderPath = folderPath };
+                db.FolderCategories.Add(entry);
+                await db.SaveChangesAsync(); // necesario para obtener el Id que nombra el archivo
+            }
+
+            oldCoverPath = entry.CoverImagePath;
+
+            // Nombre unico por captura: la cache de imagenes (ThumbnailLoader) es por ruta, asi que
+            // reusar la misma ruta mostraria la portada vieja hasta reiniciar. Una ruta nueva siempre
+            // se decodifica fresca.
+            var stamp = DateTime.UtcNow.Ticks;
+            newCoverPath = Path.Combine(ThumbnailService.ThumbnailDirectory, $"cover_{entry.Id}_{stamp}.jpg");
+
+            var ok = await _thumbnailService.CaptureAtPositionAsync(videoPath, fraction, newCoverPath);
+            if (!ok)
+            {
+                ShowCoverFeedback(Loc.I["Cover_Failed"]);
+                return;
+            }
+
+            entry.CoverImagePath = newCoverPath;
+            await db.SaveChangesAsync();
+        }
+        catch
+        {
+            ShowCoverFeedback(Loc.I["Cover_Failed"]);
+            return;
+        }
+
+        // La portada vieja se borra recien cuando la nueva ya quedo guardada (best effort).
+        if (!string.IsNullOrEmpty(oldCoverPath) && !string.Equals(oldCoverPath, newCoverPath, StringComparison.OrdinalIgnoreCase))
+            TryDeleteCoverFile(oldCoverPath);
+
+        ShowCoverFeedback(Loc.I["Cover_Set"]);
+    }
+
+    private void ShowCoverFeedback(string text, bool autoHide = true)
+    {
+        CoverFeedbackText = text;
+        IsCoverFeedbackVisible = true;
+
+        _coverFeedbackTimer.Stop();
+        if (autoHide)
+            _coverFeedbackTimer.Start();
+    }
+
+    private static void TryDeleteCoverFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+            // best effort: si no se puede borrar la portada vieja, no es critico.
+        }
+    }
+
     /// <summary>Texto "Cuadro N" localizado; vacio si no hay numero de cuadro conocido todavia.</summary>
     public string FrameNumberText => CurrentFrameNumber.HasValue
         ? string.Format(Loc.I["Player_FrameNumberFormat"], CurrentFrameNumber.Value)
@@ -484,11 +590,12 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         return Math.Min(VisibleFrameTickCount - 1, (int)(fraction * VisibleFrameTickCount));
     }
 
-    public PlayerViewModel(LibVLC libVlc, ProgressTrackerService progressTracker, VideoMarkerService markerService, Action goBack)
+    public PlayerViewModel(LibVLC libVlc, ProgressTrackerService progressTracker, VideoMarkerService markerService, ThumbnailService thumbnailService, Action goBack)
     {
         _libVlc = libVlc;
         _progressTracker = progressTracker;
         _markerService = markerService;
+        _thumbnailService = thumbnailService;
         _goBack = goBack;
 
         MediaPlayer = new MediaPlayer(_libVlc);
@@ -515,6 +622,13 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             var settings = AppSettings.Load();
             settings.AnimatorWindowOpacityPercent = WindowOpacityPercent;
             settings.Save();
+        };
+
+        _coverFeedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        _coverFeedbackTimer.Tick += (_, _) =>
+        {
+            _coverFeedbackTimer.Stop();
+            IsCoverFeedbackVisible = false;
         };
     }
 

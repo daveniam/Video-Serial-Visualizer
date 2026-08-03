@@ -404,8 +404,15 @@ public partial class FoldersViewModel : ObservableObject
                 categories.TryGetValue(group.FolderPath, out var category);
                 thumbnailsByFolder.TryGetValue(group.FolderPath, out var thumbnailPath);
 
+                // Portada elegida a mano (clic derecho en la barra del reproductor) tiene prioridad
+                // sobre la miniatura del ultimo video. Si el archivo ya no esta, se cae al default.
+                var coverPath = category?.CoverImagePath;
+                var effectiveThumbnail = !string.IsNullOrEmpty(coverPath) && File.Exists(coverPath)
+                    ? coverPath
+                    : thumbnailPath;
+
                 return new FolderCardViewModel(
-                    group.FolderPath, group.Count, thumbnailPath,
+                    group.FolderPath, group.Count, effectiveThumbnail,
                     category?.DisplayName, category?.Favorito ?? false, category?.CategoryId);
             })
             .ToList();

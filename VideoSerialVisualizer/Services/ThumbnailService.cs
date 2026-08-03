@@ -72,6 +72,91 @@ public class ThumbnailService
         }
     }
 
+    /// <summary>
+    /// Captura un cuadro en un punto PUNTUAL del video (fraccion 0..1) y lo escribe en
+    /// <paramref name="outputPath"/>. Es lo que usa la portada elegida a mano: a diferencia de la
+    /// miniatura automatica (que prueba varias posiciones fijas), respeta el momento que pidio el
+    /// usuario y solo si ese punto exacto no produce imagen prueba unos corrimientos chicos alrededor.
+    /// Best effort: devuelve false ante cualquier fallo, sin propagar.
+    /// </summary>
+    public async Task<bool> CaptureAtPositionAsync(string videoPath, double positionFraction, string outputPath)
+    {
+        try
+        {
+            return await CaptureAtCoreAsync(videoPath, Math.Clamp(positionFraction, 0, 1), outputPath);
+        }
+        catch
+        {
+            TryDeleteFile(outputPath);
+            return false;
+        }
+    }
+
+    private async Task<bool> CaptureAtCoreAsync(string videoPath, double positionFraction, string outputPath)
+    {
+        using var media = new Media(_libVlc, new Uri(videoPath));
+        using var mediaPlayer = new MediaPlayer(_libVlc) { Volume = 0 };
+
+        if (_hiddenRenderWindow != IntPtr.Zero)
+            mediaPlayer.Hwnd = _hiddenRenderWindow;
+
+        var playingTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var errorTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        EventHandler<EventArgs>? onPlaying = (_, _) => playingTcs.TrySetResult(true);
+        EventHandler<EventArgs>? onError = (_, _) => errorTcs.TrySetResult(true);
+
+        mediaPlayer.Playing += onPlaying;
+        mediaPlayer.EncounteredError += onError;
+
+        try
+        {
+            mediaPlayer.Play(media);
+
+            var readyTask = await Task.WhenAny(playingTcs.Task, errorTcs.Task, Task.Delay(SnapshotTimeoutMs));
+            if (readyTask != playingTcs.Task)
+                return false;
+
+            var durationMs = mediaPlayer.Length;
+            var lengthWait = 0;
+            while (durationMs <= 0 && lengthWait < 1000)
+            {
+                await Task.Delay(100);
+                durationMs = mediaPlayer.Length;
+                lengthWait += 100;
+            }
+
+            // Corrimientos (en fraccion de la duracion) alrededor del punto pedido: primero el exacto,
+            // luego un poco antes/despues por si ese cuadro cae en una transicion que el decoder no
+            // resuelve. Con duracion desconocida no se puede seekear: se captura donde este.
+            var offsets = new[] { 0.0, 0.01, -0.01, 0.03, -0.03 };
+            foreach (var offset in offsets)
+            {
+                if (durationMs > 0)
+                {
+                    var pos = Math.Clamp(positionFraction + offset, 0, 1);
+                    mediaPlayer.Time = (long)(durationMs * pos);
+                }
+
+                await Task.Delay(SeekSettleDelayMs);
+
+                if (await TrySnapshotAsync(mediaPlayer, outputPath))
+                    return true;
+
+                if (durationMs <= 0)
+                    return false;
+            }
+
+            return false;
+        }
+        finally
+        {
+            mediaPlayer.Playing -= onPlaying;
+            mediaPlayer.EncounteredError -= onError;
+            mediaPlayer.Stop();
+        }
+    }
+
     private async Task<(bool Ok, long DurationMs)> CaptureFrameAsync(string videoPath, string outputPath)
     {
         using var media = new Media(_libVlc, new Uri(videoPath));

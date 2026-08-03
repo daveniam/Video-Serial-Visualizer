@@ -69,7 +69,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         FoldersViewModel = new FoldersViewModel(scannerService, OpenFolder);
         LibraryViewModel = new LibraryViewModel(OpenPlayer, BackToFolders);
-        PlayerViewModel = new PlayerViewModel(_libVlc!, progressTracker, markerService, BackToLibrary);
+        PlayerViewModel = new PlayerViewModel(_libVlc!, progressTracker, markerService, thumbnailService, BackToLibrary);
 
         OnPropertyChanged(nameof(FoldersViewModel));
         OnPropertyChanged(nameof(LibraryViewModel));

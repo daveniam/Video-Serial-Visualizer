@@ -25,5 +25,12 @@ public class FolderCategory
 
     public int? CategoryId { get; set; }
 
+    /// <summary>
+    /// Portada elegida a mano para el grupo (ruta absoluta a un JPG en la carpeta de miniaturas).
+    /// La fija el usuario con clic derecho sobre la barra del reproductor. Si es null, la caratula
+    /// cae al comportamiento por defecto (la miniatura del ultimo video del grupo).
+    /// </summary>
+    public string? CoverImagePath { get; set; }
+
     public Category? Category { get; set; }
 }

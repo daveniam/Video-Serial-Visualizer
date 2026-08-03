@@ -130,7 +130,8 @@ public class AppDbContext : DbContext
                     FolderPath TEXT NOT NULL,
                     DisplayName TEXT NULL,
                     Favorito INTEGER NOT NULL DEFAULT 0,
-                    CategoryId INTEGER NULL
+                    CategoryId INTEGER NULL,
+                    CoverImagePath TEXT NULL
                 )");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IX_FolderCategories_FolderPath ON FolderCategories (FolderPath)");
@@ -151,6 +152,9 @@ public class AppDbContext : DbContext
 
             if (!categoryColumns.Contains("CategoryId"))
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE FolderCategories ADD COLUMN CategoryId INTEGER NULL");
+
+            if (!categoryColumns.Contains("CoverImagePath"))
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE FolderCategories ADD COLUMN CoverImagePath TEXT NULL");
         }
 
         var categoriesTableExists = false;

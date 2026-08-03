@@ -115,6 +115,16 @@
 
         <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" Padding="16,10,16,10">
             <StackPanel>
+                <!-- Aviso breve tras fijar la portada del grupo (clic derecho en la barra). Va aca, en
+                     la barra de controles (contenido WPF normal), y no sobre el video: ahi la ventana
+                     nativa de LibVLC lo taparia (airspace). -->
+                <Border Visibility="{Binding IsCoverFeedbackVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="10,5" Margin="0,0,0,8"
+                        HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding CoverFeedbackText}" Foreground="{StaticResource TextPrimaryBrush}"
+                               FontSize="12" VerticalAlignment="Center" />
+                </Border>
+
                 <!-- Barra del modo animador: herramientas de estudio cuadro a cuadro (paso a
                      fotograma, bucle, seleccion de segmento; las etiquetas se agregan en la fase
                      siguiente). -->
@@ -301,12 +311,22 @@
 
                     <!-- Capa interactiva de arrastre: reemplaza al Slider de WPF. Cubre toda la barra,
                          calcula el punto por la X del cursor (clic = salto exacto, arrastre = seek en
-                         vivo). Va antes de los marcadores para que ellos queden arriba y reciban su clic. -->
+                         vivo). Va antes de los marcadores para que ellos queden arriba y reciban su clic.
+                         Clic derecho: registra el punto (RightDownCommand) y abre el menu para fijar la
+                         portada del grupo con el cuadro de ese momento. -->
                     <Border Background="Transparent" Cursor="Hand"
                             helpers:ScrubBar.IsEnabled="True"
                             helpers:ScrubBar.BeginCommand="{Binding ScrubBeginCommand}"
                             helpers:ScrubBar.UpdateCommand="{Binding ScrubUpdateCommand}"
-                            helpers:ScrubBar.EndCommand="{Binding ScrubEndCommand}" />
+                            helpers:ScrubBar.EndCommand="{Binding ScrubEndCommand}"
+                            helpers:ScrubBar.RightDownCommand="{Binding RecordCoverPointCommand}">
+                        <Border.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="{loc:Tr Cover_SetAsGroupCover}"
+                                          Command="{Binding SetGroupCoverCommand}" />
+                            </ContextMenu>
+                        </Border.ContextMenu>
+                    </Border>
 
                     <!-- Etiquetas de linea de tiempo (modo animador): un rombo en la posicion exacta
                          de cada marca, con vista previa Markdown al pasar el mouse. Van DESPUES del
