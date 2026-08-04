@@ -114,6 +114,8 @@
   "Error_Unexpected_Handled": "Произошла непредвиденная ошибка, закрытие приложения было предотвращено:\n\n{0}",
   "Error_Unexpected_Message": "Произошла непредвиденная ошибка:\n\n{0}",
   "App_AlreadyRunning": "Video Serial Visualizer уже запущен.",
+  "Update_Available_Title": "Доступно обновление",
+  "Update_Available_Message": "Доступна новая версия Video Serial Visualizer ({0}).\n\nОбновить сейчас? Приложение перезапустится.\n\nЕсли выбрать «Нет», обновление установится при следующем закрытии приложения.",
 
   "About_Title": "О программе",
   "About_Version": "Версия {0}",

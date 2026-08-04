@@ -114,6 +114,8 @@
   "Error_Unexpected_Handled": "予期しないエラーが発生しましたが、アプリの終了を回避しました:\n\n{0}",
   "Error_Unexpected_Message": "予期しないエラーが発生しました:\n\n{0}",
   "App_AlreadyRunning": "Video Serial Visualizer はすでに起動しています。",
+  "Update_Available_Title": "アップデートがあります",
+  "Update_Available_Message": "Video Serial Visualizer の新しいバージョン ({0}) があります。\n\n今すぐ更新しますか？アプリが再起動します。\n\nいいえを選ぶと、次にアプリを閉じたときにインストールされます。",
 
   "About_Title": "このアプリについて",
   "About_Version": "バージョン {0}",

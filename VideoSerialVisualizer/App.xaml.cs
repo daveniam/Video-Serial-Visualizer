@@ -43,8 +43,30 @@ public partial class App : Application
         await _mainViewModel.InitializeAsync();
 
         // Recien despues de que la app esta usable: buscar y bajar la actualizacion en segundo
-        // plano, sin bloquear ni molestar. Se instala al cerrar (ver OnExit).
+        // plano, sin bloquear ni molestar.
         await _updateService.CheckAndDownloadAsync();
+
+        // Ya descargada, se le pregunta al usuario si quiere actualizar ahora (reinicia) o mas tarde
+        // (si dice que no, igual se aplica sola al cerrar, ver OnExit). Se avisa recien aca, con la
+        // descarga terminada, asi "actualizar ahora" es instantaneo y no hay que esperar nada.
+        PromptForUpdateIfAvailable();
+    }
+
+    private void PromptForUpdateIfAvailable()
+    {
+        if (!_updateService.HasPendingUpdate)
+            return;
+
+        var version = _updateService.PendingVersion ?? string.Empty;
+
+        var result = MessageBox.Show(
+            string.Format(Loc.I["Update_Available_Message"], version),
+            Loc.I["Update_Available_Title"],
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+
+        if (result == MessageBoxResult.Yes)
+            _updateService.ApplyUpdatesAndRestart();
     }
 
     protected override void OnExit(ExitEventArgs e)

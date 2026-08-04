@@ -31,6 +31,9 @@ public class UpdateService
     /// <summary>Version lista para instalarse al cerrar la app, o null si no hay ninguna.</summary>
     public string? PendingVersion => _downloadedUpdate?.TargetFullRelease?.Version?.ToString();
 
+    /// <summary>Hay una actualizacion ya descargada y lista para aplicarse.</summary>
+    public bool HasPendingUpdate => _manager is not null && _downloadedUpdate is not null;
+
     /// <summary>
     /// Busca actualizaciones y, si hay una, la descarga. Nunca lanza: quedarse sin internet o que
     /// el servidor no responda no debe afectar el uso normal de la app.
@@ -60,6 +63,26 @@ public class UpdateService
         catch
         {
             // Sin conexion, servidor caido o feed mal configurado: se reintenta en el proximo arranque.
+        }
+    }
+
+    /// <summary>
+    /// Aplica la actualizacion ya descargada y reinicia la app. Es lo que se llama cuando el usuario
+    /// elige "actualizar ahora" en el aviso: cierra este proceso, instala y vuelve a abrir en la
+    /// version nueva. Si no hay nada descargado o algo falla, no hace nada (la app sigue como esta).
+    /// </summary>
+    public void ApplyUpdatesAndRestart()
+    {
+        try
+        {
+            if (_manager is null || _downloadedUpdate is null)
+                return;
+
+            _manager.ApplyUpdatesAndRestart(_downloadedUpdate.TargetFullRelease);
+        }
+        catch
+        {
+            // Si falla, la actualizacion queda pendiente y se reintenta al cerrar (ApplyPendingUpdateOnExit).
         }
     }
 

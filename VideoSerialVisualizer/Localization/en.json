@@ -114,6 +114,8 @@
   "Error_Unexpected_Handled": "An unexpected error occurred and the app avoided closing:\n\n{0}",
   "Error_Unexpected_Message": "An unexpected error occurred:\n\n{0}",
   "App_AlreadyRunning": "Video Serial Visualizer is already open.",
+  "Update_Available_Title": "Update available",
+  "Update_Available_Message": "A new version of Video Serial Visualizer ({0}) is available.\n\nUpdate now? The app will restart.\n\nIf you choose no, it will install the next time you close the app.",
 
   "About_Title": "About",
   "About_Version": "Version {0}",
