@@ -1639,6 +1639,52 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         }
     }
 
+    // --- Atajos de reproductor comunes (teclado) ---
+    //
+    // Saltos con las flechas: chico (5s) sin modificador, grande (10s) con Shift; volumen con
+    // arriba/abajo. Ver los KeyBinding en PlayerView.xaml. El paso a cuadro sigue en Ctrl+flechas
+    // y en "," / ".", asi que las flechas solas quedan libres para el salto normal.
+    private const double SeekStepShortMs = 5_000;
+    private const double SeekStepLongMs = 10_000;
+    private const int VolumeStep = 5;
+
+    [RelayCommand]
+    private void SeekBackward() => SeekBy(-SeekStepShortMs);
+
+    [RelayCommand]
+    private void SeekForward() => SeekBy(SeekStepShortMs);
+
+    [RelayCommand]
+    private void SeekBackwardLong() => SeekBy(-SeekStepLongMs);
+
+    [RelayCommand]
+    private void SeekForwardLong() => SeekBy(SeekStepLongMs);
+
+    private void SeekBy(double deltaMs)
+    {
+        if (CurrentVideo is null || DurationMs <= 0)
+            return;
+
+        SeekTo(Math.Clamp(PositionMs + deltaMs, 0, DurationMs));
+    }
+
+    [RelayCommand]
+    private void VolumeUp() => Volume = Math.Clamp(Volume + VolumeStep, 0, 100);
+
+    [RelayCommand]
+    private void VolumeDown() => Volume = Math.Clamp(Volume - VolumeStep, 0, 100);
+
+    /// <summary>Tecla M: en un reproductor normal silencia; en modo animador sigue siendo "agregar
+    /// etiqueta" (su uso documentado). Asi M hace lo esperable en cada contexto sin pisar nada.</summary>
+    [RelayCommand]
+    private async Task MarkerOrMuteAsync()
+    {
+        if (IsAnimatorModeEnabled)
+            await AddMarkerAsync();
+        else
+            ToggleMute();
+    }
+
     partial void OnVolumeChanged(int value)
     {
         MediaPlayer.Volume = value;

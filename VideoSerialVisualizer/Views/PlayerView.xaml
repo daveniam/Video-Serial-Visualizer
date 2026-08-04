@@ -10,14 +10,30 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:PlayerViewModel}"
              Background="{StaticResource BgPrimaryBrush}">
-    <!-- Atajos del modo animador. Solo se disparan mientras el foco de teclado de WPF esta dentro
-         de este control (ver PlayerView.xaml.cs: se reclama el foco tras cada clic en el video,
-         porque un clic nativo se lo lleva a la ventana hija de LibVLC). Los comandos de loop/
-         segmento/paso a cuadro ya se auto-protegen con IsAnimatorModeEnabled, asi que estos
-         bindings quedan activos siempre sin filtrar nada aca. Espacio (play/pausa) es la excepcion:
-         es una funcion base, no especifica del modo animador. -->
+    <!-- Atajos del reproductor. Solo se disparan mientras el foco de teclado de WPF esta dentro de
+         este control (ver PlayerView.xaml.cs: se reclama el foco tras cada clic en el video, porque
+         un clic nativo se lo lleva a la ventana hija de LibVLC). Los comandos de loop/segmento/paso
+         a cuadro se auto-protegen con IsAnimatorModeEnabled, asi que quedan activos sin filtrar nada
+         aca (en modo normal no hacen nada).
+
+         Convive lo "normal de reproductor" con lo especifico del modo animador sin pisarse:
+           - Flechas solas = salto de 5s; con Shift = 10s. El paso a cuadro usa Ctrl+flechas y "," ".".
+           - Arriba/Abajo = volumen.
+           - Espacio / K = play-pausa.
+           - M = silenciar en modo normal, o agregar etiqueta en modo animador (comando MarkerOrMute). -->
     <UserControl.InputBindings>
+        <!-- Base de reproductor -->
         <KeyBinding Key="Space" Command="{Binding PlayPauseCommand}" />
+        <KeyBinding Key="K" Command="{Binding PlayPauseCommand}" />
+        <KeyBinding Key="Left" Command="{Binding SeekBackwardCommand}" />
+        <KeyBinding Key="Right" Command="{Binding SeekForwardCommand}" />
+        <KeyBinding Modifiers="Shift" Key="Left" Command="{Binding SeekBackwardLongCommand}" />
+        <KeyBinding Modifiers="Shift" Key="Right" Command="{Binding SeekForwardLongCommand}" />
+        <KeyBinding Key="Up" Command="{Binding VolumeUpCommand}" />
+        <KeyBinding Key="Down" Command="{Binding VolumeDownCommand}" />
+        <KeyBinding Key="M" Command="{Binding MarkerOrMuteCommand}" />
+
+        <!-- Modo animador (no-op en modo normal) -->
         <KeyBinding Key="OemComma" Command="{Binding StepFrameBackwardCommand}" />
         <KeyBinding Key="OemPeriod" Command="{Binding StepFrameForwardCommand}" />
         <KeyBinding Modifiers="Ctrl" Key="Left" Command="{Binding StepFrameBackwardCommand}" />
@@ -26,7 +42,6 @@
         <KeyBinding Key="O" Command="{Binding SetSegmentEndCommand}" />
         <KeyBinding Key="L" Command="{Binding ToggleLoopCommand}" />
         <KeyBinding Key="Escape" Command="{Binding ClearSegmentCommand}" />
-        <KeyBinding Key="M" Command="{Binding AddMarkerCommand}" />
     </UserControl.InputBindings>
     <Grid>
         <Grid.RowDefinitions>
