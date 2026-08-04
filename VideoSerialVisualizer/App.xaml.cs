@@ -86,7 +86,7 @@ public partial class App : Application
         try
         {
             MessageBox.Show(
-                string.Format(Loc.I["Error_Unexpected_Handled"], e.Exception.Message),
+                string.Format(Loc.I["Error_Unexpected_Handled"], Describe(e.Exception)),
                 Loc.I["Error_Unexpected_Title"],
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -102,10 +102,25 @@ public partial class App : Application
         if (e.ExceptionObject is Exception ex)
         {
             MessageBox.Show(
-                string.Format(Loc.I["Error_Unexpected_Message"], ex.Message),
+                string.Format(Loc.I["Error_Unexpected_Message"], Describe(ex)),
                 Loc.I["Error_Unexpected_Title"],
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+    }
+
+    /// <summary>
+    /// Arma el texto del error recorriendo la cadena de InnerException. Muchas fallas utiles (p.ej.
+    /// EF Core envuelve el error real de SQLite en un DbUpdateException con el mensaje generico "See
+    /// the inner exception for details") solo se entienden viendo la causa interna; mostrar solo el
+    /// mensaje de mas afuera deja al usuario sin la pista que hace falta para arreglarlo.
+    /// </summary>
+    private static string Describe(Exception ex)
+    {
+        var messages = new List<string>();
+        for (Exception? current = ex; current is not null; current = current.InnerException)
+            messages.Add($"{current.GetType().Name}: {current.Message}");
+
+        return string.Join("\n\n→ ", messages);
     }
 }
