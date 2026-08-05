@@ -14,7 +14,11 @@ public readonly record struct ScanProgress(string FileName, int Current, int Tot
 
 public class FolderScannerService
 {
-    private static readonly string[] VideoExtensions = { ".mp4", ".mkv", ".avi", ".mov", ".webm" };
+    private static readonly string[] VideoExtensions =
+    {
+        ".mp4", ".m4v", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv",
+        ".mpg", ".mpeg", ".ts", ".m2ts", ".3gp", ".ogv"
+    };
 
     private readonly LibVLC _libVlc;
     private readonly ThumbnailService _thumbnailService;
