@@ -159,10 +159,8 @@
                                     <StackPanel Grid.Row="1" Margin="12,10,12,12" IsHitTestVisible="False">
                                         <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis" ToolTip="{Binding FolderPath}" />
-                                        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0">
-                                            <Run Text="{Binding VideoCount, Mode=OneWay}" />
-                                            <Run Text="{loc:Tr Common_VideosSuffix}" />
-                                        </TextBlock>
+                                        <TextBlock Text="{Binding InfoText}" Foreground="{StaticResource TextSecondaryBrush}"
+                                                   FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </Grid>
                             </Border>

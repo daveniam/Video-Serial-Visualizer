@@ -6,6 +6,8 @@
   "Common_Rename": "Rename",
   "Common_Search": "Search...",
   "Common_VideosSuffix": " video(s)",
+  "Common_HoursShort": "h",
+  "Common_MinutesShort": "min",
 
   "Explore_Title": "Explore",
   "Explore_AddFolder": "Add folder",

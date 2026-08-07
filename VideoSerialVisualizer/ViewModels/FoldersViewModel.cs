@@ -359,11 +359,11 @@ public partial class FoldersViewModel : ObservableObject
     {
         await using var db = new AppDbContext();
 
-        // El conteo por carpeta se resuelve con GROUP BY en SQL: devuelve una fila por grupo en vez
-        // de traer la tabla Videos entera a memoria solo para contarla.
+        // El conteo y la duracion total por carpeta se resuelven con GROUP BY en SQL: una fila por
+        // grupo (con COUNT y SUM), en vez de traer la tabla Videos entera a memoria.
         var folderCounts = await db.Videos.AsNoTracking()
             .GroupBy(v => v.CarpetaOrigen)
-            .Select(g => new { FolderPath = g.Key, Count = g.Count() })
+            .Select(g => new { FolderPath = g.Key, Count = g.Count(), TotalMs = g.Sum(v => v.DuracionMs) })
             .ToListAsync();
 
         // Para la caratula solo hacen falta los videos que TIENEN miniatura, y solo tres columnas
@@ -412,7 +412,7 @@ public partial class FoldersViewModel : ObservableObject
                     : thumbnailPath;
 
                 return new FolderCardViewModel(
-                    group.FolderPath, group.Count, effectiveThumbnail,
+                    group.FolderPath, group.Count, group.TotalMs, effectiveThumbnail,
                     category?.DisplayName, category?.Favorito ?? false, category?.CategoryId);
             })
             .ToList();
