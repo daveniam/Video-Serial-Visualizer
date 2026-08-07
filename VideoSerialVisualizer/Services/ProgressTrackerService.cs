@@ -22,6 +22,12 @@ public class ProgressTrackerService
     {
         await using var db = new AppDbContext();
 
+        // Si el video ya no esta en la base (p.ej. se quito su carpeta mientras se reproducia, o la
+        // fila quedo de un estado inconsistente), no se guarda progreso: insertarlo violaria la FK y
+        // tiraria el dialogo de error. Se omite en silencio, no hay nada util que registrar.
+        if (!await db.Videos.AnyAsync(v => v.Id == videoId))
+            return;
+
         var progress = await db.Progress.FirstOrDefaultAsync(p => p.VideoId == videoId);
         var completado = durationMs > 0 && positionMs >= durationMs * CompletionThreshold;
 

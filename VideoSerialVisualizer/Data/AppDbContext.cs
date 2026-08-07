@@ -33,7 +33,12 @@ public class AppDbContext : DbContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         Directory.CreateDirectory(DatabaseDirectory);
-        optionsBuilder.UseSqlite($"Data Source={DatabasePath}");
+
+        // "Foreign Keys=True" activa PRAGMA foreign_keys en CADA conexion. Es imprescindible: sin
+        // esto, SQLite no aplica las cascadas ON DELETE, asi que borrar un video dejaba su progreso
+        // y sus etiquetas huerfanos. Esas filas huerfanas son las que despues rompen un guardado con
+        // "FOREIGN KEY constraint failed". Con la cascada activa, borrar un video se lleva lo suyo.
+        optionsBuilder.UseSqlite($"Data Source={DatabasePath};Foreign Keys=True");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -199,5 +204,12 @@ public class AppDbContext : DbContext
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IX_Markers_VideoId ON Markers (VideoId)");
         }
+
+        // Auto-reparacion: borra filas hijas huerfanas (progreso y etiquetas cuyo video ya no existe).
+        // Pueden haber quedado de una version anterior a la que se le activara la cascada de FK, en la
+        // que borrar un video no se llevaba su progreso/etiquetas. Esas huerfanas son las que rompian
+        // un guardado posterior con "FOREIGN KEY constraint failed"; sin padre no le sirven a nadie.
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM Progress WHERE VideoId NOT IN (SELECT Id FROM Videos)");
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM Markers WHERE VideoId NOT IN (SELECT Id FROM Videos)");
     }
 }
