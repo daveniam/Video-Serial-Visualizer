@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<WatchProgress> Progress => Set<WatchProgress>();
     public DbSet<FolderCategory> FolderCategories => Set<FolderCategory>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<FolderTag> FolderTags => Set<FolderTag>();
     public DbSet<VideoMarker> Markers => Set<VideoMarker>();
 
     /// <summary>
@@ -74,6 +75,21 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(f => f.CategoryId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Enlace grupo<->categoria (muchos a muchos). Una carpeta no puede tener dos veces la misma
+        // categoria (indice unico); borrar una categoria se lleva sus enlaces (cascade).
+        modelBuilder.Entity<FolderTag>()
+            .HasIndex(t => new { t.FolderPath, t.CategoryId })
+            .IsUnique();
+
+        modelBuilder.Entity<FolderTag>()
+            .HasIndex(t => t.CategoryId);
+
+        modelBuilder.Entity<FolderTag>()
+            .HasOne(t => t.Category)
+            .WithMany()
+            .HasForeignKey(t => t.CategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Un video puede tener muchas etiquetas; se borran solas si se borra el video (no tiene
         // sentido dejar etiquetas huerfanas apuntando a un VideoId que ya no existe).
@@ -179,6 +195,40 @@ public class AppDbContext : DbContext
                 )");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IX_Categories_Name ON Categories (Name)");
+        }
+
+        var folderTagsTableExists = false;
+        await using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='FolderTags'";
+            var result = await cmd.ExecuteScalarAsync();
+            folderTagsTableExists = result is not null;
+        }
+
+        if (!folderTagsTableExists)
+        {
+            // Enlace muchos-a-muchos grupo<->categoria. FK a Categories con cascade a mano (estas
+            // sentencias no pasan por OnModelCreating).
+            await db.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE FolderTags (
+                    Id INTEGER NOT NULL CONSTRAINT PK_FolderTags PRIMARY KEY AUTOINCREMENT,
+                    FolderPath TEXT NOT NULL,
+                    CategoryId INTEGER NOT NULL,
+                    CONSTRAINT FK_FolderTags_Categories_CategoryId FOREIGN KEY (CategoryId) REFERENCES Categories (Id) ON DELETE CASCADE
+                )");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IX_FolderTags_FolderPath_CategoryId ON FolderTags (FolderPath, CategoryId)");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IX_FolderTags_CategoryId ON FolderTags (CategoryId)");
+
+            // Migracion UNICA (solo al crear la tabla): traslada la categoria unica que tenia cada
+            // grupo en la columna vieja FolderCategories.CategoryId a un enlace en FolderTags. Correr
+            // esto en cada arranque re-agregaria una categoria que el usuario haya quitado, por eso
+            // va aca dentro y no afuera.
+            await db.Database.ExecuteSqlRawAsync(@"
+                INSERT INTO FolderTags (FolderPath, CategoryId)
+                SELECT FolderPath, CategoryId FROM FolderCategories
+                WHERE CategoryId IS NOT NULL AND CategoryId IN (SELECT Id FROM Categories)");
         }
 
         var markersTableExists = false;

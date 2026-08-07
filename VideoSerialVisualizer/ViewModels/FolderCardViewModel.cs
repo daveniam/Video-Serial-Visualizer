@@ -61,13 +61,15 @@ public partial class FolderCardViewModel : ObservableObject
     [ObservableProperty]
     private bool favorito;
 
-    [ObservableProperty]
-    private int? categoryId;
+    /// <summary>Categorias asignadas al grupo (puede ser mas de una). Se usa para el filtro por
+    /// categoria en Explorar. Se reemplaza entero al reasignar; no hace falta que sea observable
+    /// porque no se muestra en la tarjeta.</summary>
+    public IReadOnlyCollection<int> CategoryIds { get; set; }
 
     [ObservableProperty]
     private ImageSource? thumbnailImage;
 
-    public FolderCardViewModel(string folderPath, int videoCount, long totalDurationMs, string? thumbnailPath, string? customDisplayName, bool favorito, int? categoryId)
+    public FolderCardViewModel(string folderPath, int videoCount, long totalDurationMs, string? thumbnailPath, string? customDisplayName, bool favorito, IReadOnlyCollection<int> categoryIds)
     {
         FolderPath = folderPath;
 
@@ -80,7 +82,7 @@ public partial class FolderCardViewModel : ObservableObject
         ThumbnailPath = thumbnailPath;
         displayName = string.IsNullOrWhiteSpace(customDisplayName) ? FolderName : customDisplayName;
         this.favorito = favorito;
-        this.categoryId = categoryId;
+        CategoryIds = categoryIds;
     }
 
     public async Task LoadThumbnailAsync()

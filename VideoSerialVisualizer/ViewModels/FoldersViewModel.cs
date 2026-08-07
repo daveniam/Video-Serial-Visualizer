@@ -180,16 +180,23 @@ public partial class FoldersViewModel : ObservableObject
         if (card is null)
             return;
 
-        var (confirmed, categoryId) = AssignCategoryDialog.PromptAssign(Categories.ToList(), card.CategoryId, Application.Current.MainWindow);
+        var (confirmed, selectedIds) = AssignCategoryDialog.PromptAssign(Categories.ToList(), card.CategoryIds, Application.Current.MainWindow);
         if (!confirmed)
             return;
 
         await using var db = new AppDbContext();
-        var entry = await GetOrCreateCategoryAsync(db, card.FolderPath);
-        entry.CategoryId = categoryId;
+
+        // Se reemplaza el conjunto entero: se borran los enlaces actuales del grupo y se agregan los
+        // elegidos. Simple y sin sorpresas frente a un merge incremental.
+        var existing = await db.FolderTags.Where(t => t.FolderPath == card.FolderPath).ToListAsync();
+        db.FolderTags.RemoveRange(existing);
+
+        foreach (var id in selectedIds.Distinct())
+            db.FolderTags.Add(new FolderTag { FolderPath = card.FolderPath, CategoryId = id });
+
         await db.SaveChangesAsync();
 
-        card.CategoryId = categoryId;
+        card.CategoryIds = selectedIds.ToHashSet();
 
         if (SelectedCategoryId is not null)
             ApplyFilter();
@@ -384,6 +391,15 @@ public partial class FoldersViewModel : ObservableObject
         var categories = await db.FolderCategories.AsNoTracking().ToDictionaryAsync(c => c.FolderPath);
         var allCategories = await db.Categories.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
 
+        // Categorias asignadas a cada grupo (puede haber varias). Se agrupan por carpeta para el
+        // filtro de Explorar.
+        var tagsByFolder = (await db.FolderTags.AsNoTracking().ToListAsync())
+            .GroupBy(t => t.FolderPath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyCollection<int>)g.Select(t => t.CategoryId).ToHashSet(),
+                StringComparer.OrdinalIgnoreCase);
+
         Categories.Clear();
         foreach (var category in allCategories)
             Categories.Add(category);
@@ -403,6 +419,7 @@ public partial class FoldersViewModel : ObservableObject
             {
                 categories.TryGetValue(group.FolderPath, out var category);
                 thumbnailsByFolder.TryGetValue(group.FolderPath, out var thumbnailPath);
+                tagsByFolder.TryGetValue(group.FolderPath, out var categoryIds);
 
                 // Portada elegida a mano (clic derecho en la barra del reproductor) tiene prioridad
                 // sobre la miniatura del ultimo video. Si el archivo ya no esta, se cae al default.
@@ -413,7 +430,8 @@ public partial class FoldersViewModel : ObservableObject
 
                 return new FolderCardViewModel(
                     group.FolderPath, group.Count, group.TotalMs, effectiveThumbnail,
-                    category?.DisplayName, category?.Favorito ?? false, category?.CategoryId);
+                    category?.DisplayName, category?.Favorito ?? false,
+                    categoryIds ?? Array.Empty<int>());
             })
             .ToList();
 
@@ -433,7 +451,7 @@ public partial class FoldersViewModel : ObservableObject
             filtered = filtered.Where(f => f.Favorito);
 
         if (SelectedCategoryId is int categoryId)
-            filtered = filtered.Where(f => f.CategoryId == categoryId);
+            filtered = filtered.Where(f => f.CategoryIds.Contains(categoryId));
 
         if (!string.IsNullOrWhiteSpace(SearchText))
             filtered = filtered.Where(f => f.DisplayName.Contains(SearchText, StringComparison.OrdinalIgnoreCase));

@@ -4,6 +4,7 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Models;
 
@@ -11,39 +12,52 @@ namespace VideoSerialVisualizer.Views;
 
 public partial class AssignCategoryDialog : Window
 {
-    private readonly List<RadioButton> _optionButtons = new();
+    private readonly List<CheckBox> _optionBoxes = new();
 
-    public int? ResultCategoryId { get; private set; }
+    public IReadOnlyList<int> ResultCategoryIds { get; private set; } = Array.Empty<int>();
 
-    public AssignCategoryDialog(IReadOnlyList<Category> categories, int? currentCategoryId)
+    public AssignCategoryDialog(IReadOnlyList<Category> categories, IReadOnlyCollection<int> currentCategoryIds)
     {
         InitializeComponent();
 
-        AddOption(Loc.I["Category_None"], null, currentCategoryId is null);
+        if (categories.Count == 0)
+        {
+            // Sin categorias creadas todavia: se avisa en vez de dejar la lista vacia y confusa.
+            OptionsPanel.Children.Add(new TextBlock
+            {
+                Text = Loc.I["Category_NoneYet"],
+                Foreground = (Brush)FindResource("TextSecondaryBrush"),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 13
+            });
+            return;
+        }
+
         foreach (var category in categories)
-            AddOption(category.Name, category.Id, currentCategoryId == category.Id);
+            AddOption(category.Name, category.Id, currentCategoryIds.Contains(category.Id));
     }
 
-    private void AddOption(string text, int? id, bool isChecked)
+    private void AddOption(string text, int id, bool isChecked)
     {
-        var radio = new RadioButton
+        var box = new CheckBox
         {
-            GroupName = "CategoryOptions",
             Content = text,
             IsChecked = isChecked,
             Tag = id,
-            Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush"),
+            Foreground = (Brush)FindResource("TextPrimaryBrush"),
             Margin = new Thickness(0, 0, 0, 10),
             FontSize = 14
         };
-        _optionButtons.Add(radio);
-        OptionsPanel.Children.Add(radio);
+        _optionBoxes.Add(box);
+        OptionsPanel.Children.Add(box);
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        var selected = _optionButtons.FirstOrDefault(r => r.IsChecked == true);
-        ResultCategoryId = selected?.Tag as int?;
+        ResultCategoryIds = _optionBoxes
+            .Where(b => b.IsChecked == true)
+            .Select(b => (int)b.Tag)
+            .ToList();
         DialogResult = true;
     }
 
@@ -52,10 +66,13 @@ public partial class AssignCategoryDialog : Window
         DialogResult = false;
     }
 
-    public static (bool Confirmed, int? CategoryId) PromptAssign(IReadOnlyList<Category> categories, int? currentCategoryId, Window? owner)
+    /// <summary>Abre el dialogo para elegir las categorias (varias) del grupo. Devuelve el conjunto
+    /// elegido; si se cancela, devuelve el actual sin cambios.</summary>
+    public static (bool Confirmed, IReadOnlyList<int> CategoryIds) PromptAssign(
+        IReadOnlyList<Category> categories, IReadOnlyCollection<int> currentCategoryIds, Window? owner)
     {
-        var dialog = new AssignCategoryDialog(categories, currentCategoryId) { Owner = owner };
+        var dialog = new AssignCategoryDialog(categories, currentCategoryIds) { Owner = owner };
         var confirmed = dialog.ShowDialog() == true;
-        return (confirmed, confirmed ? dialog.ResultCategoryId : currentCategoryId);
+        return (confirmed, confirmed ? dialog.ResultCategoryIds : currentCategoryIds.ToList());
     }
 }
