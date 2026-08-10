@@ -78,8 +78,18 @@ public partial class PlayerView : UserControl
 
     private void OnHostWindowActivated(object? sender, EventArgs e)
     {
-        if (DataContext is PlayerViewModel vm)
-            vm.IsWindowActive = true;
+        if (DataContext is not PlayerViewModel vm)
+            return;
+
+        // Se DIFIERE reabrir el overlay hasta que la activacion/restauracion de la ventana termine.
+        // Reabrirlo sincronicamente dentro del Activated (al restaurar desde minimizado) hace que el
+        // Popup pelee con la restauracion: un pitido y un segundo clic. Posponerlo a prioridad baja
+        // deja que Windows traiga la ventana al frente primero y recien ahi aparece el boton.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_hostWindow is not null && _hostWindow.WindowState != WindowState.Minimized)
+                vm.IsWindowActive = true;
+        }), System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private void OnHostWindowDeactivated(object? sender, EventArgs e)
