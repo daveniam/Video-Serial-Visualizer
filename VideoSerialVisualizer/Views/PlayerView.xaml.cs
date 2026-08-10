@@ -49,7 +49,7 @@ public partial class PlayerView : UserControl
             // que reposicionarla a mano cuando esta se mueve, cambia de tamano o se restaura.
             _hostWindow.LocationChanged += OnHostWindowMovedOrResized;
             _hostWindow.SizeChanged += OnHostWindowMovedOrResized;
-            _hostWindow.StateChanged += OnHostWindowMovedOrResized;
+            _hostWindow.StateChanged += OnHostWindowStateChanged;
             if (DataContext is PlayerViewModel v)
                 v.IsWindowActive = _hostWindow.IsActive;
         }
@@ -71,7 +71,7 @@ public partial class PlayerView : UserControl
             _hostWindow.Deactivated -= OnHostWindowDeactivated;
             _hostWindow.LocationChanged -= OnHostWindowMovedOrResized;
             _hostWindow.SizeChanged -= OnHostWindowMovedOrResized;
-            _hostWindow.StateChanged -= OnHostWindowMovedOrResized;
+            _hostWindow.StateChanged -= OnHostWindowStateChanged;
             _hostWindow = null;
         }
     }
@@ -89,6 +89,24 @@ public partial class PlayerView : UserControl
     }
 
     private void OnHostWindowMovedOrResized(object? sender, EventArgs e) => RepositionPlayOverlay();
+
+    /// <summary>
+    /// Al minimizar hay que CERRAR el overlay de play (Popup) de forma explicita. Es una ventana
+    /// topmost propia y, si queda abierta con la principal minimizada, bloquea la restauracion: al
+    /// clickear la barra de tareas Windows no puede traer la principal al frente (suena el pitido y
+    /// hacen falta varios clics). Cerrarlo la deja restaurar limpio de un solo clic; al volver
+    /// (Activated) se reabre si el video sigue pausado.
+    /// </summary>
+    private void OnHostWindowStateChanged(object? sender, EventArgs e)
+    {
+        if (_hostWindow is not null && _hostWindow.WindowState == WindowState.Minimized
+            && DataContext is PlayerViewModel vm)
+        {
+            vm.IsWindowActive = false;
+        }
+
+        RepositionPlayOverlay();
+    }
 
     /// <summary>Fuerza al Popup del overlay a recalcular su posicion respecto del video. WPF no lo
     /// hace solo cuando la ventana se mueve: se le da un empujoncito al offset (ida y vuelta) para

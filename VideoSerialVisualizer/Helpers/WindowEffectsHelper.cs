@@ -39,12 +39,26 @@ public static class WindowEffectsHelper
         {
             var exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
             SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(exStyle | WS_EX_NOACTIVATE));
+
+            // Cambiar el estilo extendido no siempre surte efecto hasta un "frame change": se fuerza
+            // con SetWindowPos (sin mover, sin redimensionar, sin cambiar z-order ni activar).
+            SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
         }
         catch
         {
             // Best effort: si falla, el Popup sigue funcionando, solo con los sintomas de activacion.
         }
     }
+
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
     /// <summary>
     /// Activa o desactiva el "click-through": con el activado, los clics atraviesan la ventana y
