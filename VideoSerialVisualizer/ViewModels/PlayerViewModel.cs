@@ -367,6 +367,15 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     /// <summary>La ventana nativa de LibVLC es la que muestra el video ahora mismo.</summary>
     public bool IsNativeVideoVisible => !IsFrameStepActive && !IsCallbackRenderingActive && !IsReferenceWindowOpen;
 
+    /// <summary>
+    /// Se DIBUJA la superficie nativa del video. Es lo que consume el WindowsFormsHost de la vista.
+    /// Se suspende mientras se redimensiona la ventana (<see cref="IsResizingWindow"/>): con la
+    /// decodificacion por hardware apagada, VLC reescala cada cuadro por CPU y el WindowsFormsHost
+    /// reubica su ventana nativa en cada pixel del arrastre, que es lo que traba. Se colapsa (queda
+    /// el fondo negro) y se restaura al soltar, ya con el tamano final.
+    /// </summary>
+    public bool ShowNativeVideoSurface => IsNativeVideoVisible && !IsResizingWindow;
+
     /// <summary>La imagen WPF del render por callbacks es la que muestra el video ahora mismo.</summary>
     public bool IsCallbackVideoVisible => !IsFrameStepActive && IsCallbackRenderingActive && !IsReferenceWindowOpen;
 
@@ -383,6 +392,14 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool isFullScreen;
 
+    /// <summary>La ventana se esta redimensionando ahora mismo (la vista lo detecta por los mensajes
+    /// del ciclo de arrastre). Mientras dura, se suspende la superficie nativa del video para que el
+    /// redimensionado sea fluido (ver <see cref="ShowNativeVideoSurface"/>).</summary>
+    [ObservableProperty]
+    private bool isResizingWindow;
+
+    partial void OnIsResizingWindowChanged(bool value) => OnPropertyChanged(nameof(ShowNativeVideoSurface));
+
     /// <summary>
     /// Boton de play grande al centro del video (estilo YouTube), visible solo con el video pausado.
     /// Se excluye el paso a cuadro (ya tiene su cuadro congelado) y la ventana de referencia (el
@@ -395,6 +412,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private void NotifyVideoSurfaceVisibilityChanged()
     {
         OnPropertyChanged(nameof(IsNativeVideoVisible));
+        OnPropertyChanged(nameof(ShowNativeVideoSurface));
         OnPropertyChanged(nameof(IsCallbackVideoVisible));
         OnPropertyChanged(nameof(IsFrameStepVisibleInMain));
         OnPropertyChanged(nameof(IsPlayOverlayVisible));

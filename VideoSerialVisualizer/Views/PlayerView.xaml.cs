@@ -30,6 +30,8 @@ public partial class PlayerView : UserControl
     }
 
     private Window? _hostWindow;
+    private HwndSource? _hostSource;
+    private bool _inSizeMove;
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -52,6 +54,11 @@ public partial class PlayerView : UserControl
             _hostWindow.StateChanged += OnHostWindowStateChanged;
             if (DataContext is PlayerViewModel v)
                 v.IsWindowActive = _hostWindow.IsActive;
+
+            // Se escucha el ciclo modal de redimensionado (WM_ENTER/EXITSIZEMOVE + WM_SIZING) para
+            // suspender la superficie nativa del video mientras se arrastra el borde. Ver HostWndProc.
+            _hostSource = PresentationSource.FromVisual(_hostWindow) as HwndSource;
+            _hostSource?.AddHook(HostWndProc);
         }
 
         // Los atajos de teclado (KeyBinding, ver PlayerView.xaml) solo disparan mientras el foco de
@@ -145,6 +152,15 @@ public partial class PlayerView : UserControl
             _hostWindow.StateChanged -= OnHostWindowStateChanged;
             _hostWindow = null;
         }
+
+        _hostSource?.RemoveHook(HostWndProc);
+        _hostSource = null;
+
+        // Por las dudas: no dejar la superficie suspendida si se sale del reproductor a mitad de un
+        // redimensionado.
+        _inSizeMove = false;
+        if (DataContext is PlayerViewModel rv)
+            rv.IsResizingWindow = false;
     }
 
     private void OnHostWindowActivated(object? sender, EventArgs e)
@@ -170,6 +186,44 @@ public partial class PlayerView : UserControl
     }
 
     private void OnHostWindowMovedOrResized(object? sender, EventArgs e) => RepositionPlayOverlay();
+
+    /// <summary>
+    /// Suspende la superficie nativa del video durante el arrastre de redimensionado. Con la GPU
+    /// apagada, reescalar cada cuadro por CPU y reubicar la ventana nativa del WindowsFormsHost en
+    /// cada pixel del arrastre es lo que traba. Se detecta el ciclo modal (WM_ENTERSIZEMOVE) y, solo
+    /// si es un REDIMENSIONADO (WM_SIZING, no un simple mover), se colapsa la superficie (queda el
+    /// fondo negro); al soltar (WM_EXITSIZEMOVE) se restaura ya con el tamano final. El audio no se
+    /// corta: VLC sigue decodificando, solo no se muestra mientras se arrastra.
+    /// </summary>
+    private IntPtr HostWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WM_SIZING = 0x0214;
+        const int WM_ENTERSIZEMOVE = 0x0231;
+        const int WM_EXITSIZEMOVE = 0x0232;
+
+        if (DataContext is not PlayerViewModel vm)
+            return IntPtr.Zero;
+
+        switch (msg)
+        {
+            case WM_ENTERSIZEMOVE:
+                _inSizeMove = true;
+                break;
+
+            case WM_SIZING:
+                if (_inSizeMove && !vm.IsResizingWindow)
+                    vm.IsResizingWindow = true;
+                break;
+
+            case WM_EXITSIZEMOVE:
+                _inSizeMove = false;
+                if (vm.IsResizingWindow)
+                    vm.IsResizingWindow = false;
+                break;
+        }
+
+        return IntPtr.Zero;
+    }
 
     /// <summary>
     /// Al minimizar hay que CERRAR el overlay de play (Popup) de forma explicita. Es una ventana

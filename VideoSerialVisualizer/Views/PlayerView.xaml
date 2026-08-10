@@ -72,7 +72,7 @@
                3. Imagen WPF del cuadro exacto de FFmpeg: mientras se revisa cuadro a cuadro. -->
         <Grid Grid.Row="1" x:Name="VideoArea" Background="Black">
             <wfi:WindowsFormsHost x:Name="VideoHost" Background="Black"
-                                   Visibility="{Binding IsNativeVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                   Visibility="{Binding ShowNativeVideoSurface, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <Image Source="{Binding VideoFrame}" Stretch="Uniform"
                    Visibility="{Binding IsCallbackVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
