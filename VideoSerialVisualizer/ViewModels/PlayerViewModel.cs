@@ -378,6 +378,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool isWindowActive = true;
 
+    /// <summary>Estado de pantalla completa. Lo maneja la vista (PlayerView.xaml.cs, que es quien
+    /// puede tocar la ventana); aca solo vive para que el boton muestre el icono correcto.</summary>
+    [ObservableProperty]
+    private bool isFullScreen;
+
     /// <summary>
     /// Boton de play grande al centro del video (estilo YouTube), visible solo con el video pausado.
     /// Se excluye el paso a cuadro (ya tiene su cuadro congelado) y la ventana de referencia (el

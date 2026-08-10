@@ -47,6 +47,7 @@
   "Player_ClearSegment": "Clear segment",
   "Player_AddMarker": "Add label at current position (M)",
   "Player_Opacity": "Opacity",
+  "Player_FullScreen": "Fullscreen (F)",
   "Cover_SetAsGroupCover": "Use this moment as the group cover",
   "Cover_Capturing": "Capturing cover…",
   "Cover_Set": "Group cover updated",

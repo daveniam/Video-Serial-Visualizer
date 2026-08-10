@@ -60,10 +60,81 @@ public partial class PlayerView : UserControl
         Keyboard.Focus(this);
     }
 
+    // --- Pantalla completa ---
+    // Se guardan el estilo/estado previos de la ventana para poder volver exactamente a como estaba.
+    private WindowStyle _prevWindowStyle;
+    private ResizeMode _prevResizeMode;
+    private WindowState _prevWindowState;
+
+    private void ToggleFullScreen_Click(object sender, RoutedEventArgs e) => ToggleFullScreen();
+
+    private void ToggleFullScreen()
+    {
+        if (_hostWindow is null || DataContext is not PlayerViewModel vm)
+            return;
+
+        if (!vm.IsFullScreen)
+        {
+            _prevWindowStyle = _hostWindow.WindowStyle;
+            _prevResizeMode = _hostWindow.ResizeMode;
+            _prevWindowState = _hostWindow.WindowState;
+
+            // WindowStyle=None + Maximized es la tecnica estandar de WPF para cubrir toda la pantalla
+            // (incluida la barra de tareas). Se pasa por Normal primero para que el maximizado se
+            // recalcule ya sin borde y tape la barra de tareas aunque ya estuviera maximizada.
+            _hostWindow.WindowStyle = WindowStyle.None;
+            _hostWindow.ResizeMode = ResizeMode.NoResize;
+            _hostWindow.WindowState = WindowState.Normal;
+            _hostWindow.WindowState = WindowState.Maximized;
+
+            vm.IsFullScreen = true;
+        }
+        else
+        {
+            _hostWindow.WindowStyle = _prevWindowStyle;
+            _hostWindow.ResizeMode = _prevResizeMode;
+            _hostWindow.WindowState = _prevWindowState;
+
+            vm.IsFullScreen = false;
+        }
+
+        // El foco vuelve a la vista para que los atajos (F, Esc, etc.) sigan disparando.
+        Keyboard.Focus(this);
+    }
+
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (DataContext is not PlayerViewModel vm)
+            return;
+
+        // F alterna pantalla completa. Esc SOLO sale de pantalla completa (si no, se deja pasar para
+        // que el atajo de limpiar segmento del modo animador siga funcionando).
+        if (e.Key == Key.F)
+        {
+            ToggleFullScreen();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && vm.IsFullScreen)
+        {
+            ToggleFullScreen();
+            e.Handled = true;
+        }
+    }
+
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         if (DataContext is PlayerViewModel vm)
             vm.DetachVideoSurface();
+
+        // Al salir del reproductor estando en pantalla completa, se restaura la ventana para no dejar
+        // la biblioteca/explorar en modo borderless.
+        if (_hostWindow is not null && DataContext is PlayerViewModel v && v.IsFullScreen)
+        {
+            _hostWindow.WindowStyle = _prevWindowStyle;
+            _hostWindow.ResizeMode = _prevResizeMode;
+            _hostWindow.WindowState = _prevWindowState;
+            v.IsFullScreen = false;
+        }
 
         if (_hostWindow is not null)
         {

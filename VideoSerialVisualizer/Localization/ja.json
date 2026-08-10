@@ -47,6 +47,7 @@
   "Player_ClearSegment": "セグメントを解除",
   "Player_AddMarker": "現在位置にラベルを追加 (M)",
   "Player_Opacity": "不透明度",
+  "Player_FullScreen": "全画面（F）",
   "Cover_SetAsGroupCover": "この場面をグループの表紙にする",
   "Cover_Capturing": "表紙を取得中…",
   "Cover_Set": "グループの表紙を更新しました",

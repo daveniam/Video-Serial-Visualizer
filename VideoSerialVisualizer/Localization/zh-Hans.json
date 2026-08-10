@@ -47,6 +47,7 @@
   "Player_ClearSegment": "清除片段",
   "Player_AddMarker": "在当前位置添加标签 (M)",
   "Player_Opacity": "不透明度",
+  "Player_FullScreen": "全屏（F）",
   "Cover_SetAsGroupCover": "将此刻设为分组封面",
   "Cover_Capturing": "正在获取封面…",
   "Cover_Set": "已更新分组封面",
