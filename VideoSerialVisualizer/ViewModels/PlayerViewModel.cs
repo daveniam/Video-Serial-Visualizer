@@ -872,6 +872,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             // LibVLC vuelve a 1x con cada media nuevo, asi que la velocidad elegida se reaplica
             // cada vez que arranca una reproduccion, no solo cuando el usuario la cambia.
             ApplyPlaybackSpeed();
+
+            // Mismo caso con el volumen: fijarlo antes/justo despues de Play() no pega porque la
+            // salida de audio todavia no existe (se veia la barra al 100 pero sin sonido hasta tocar
+            // el slider). Recien con el evento Playing el audio esta listo, asi que se reaplica aca.
+            MediaPlayer.Volume = Volume;
         });
     }
 
