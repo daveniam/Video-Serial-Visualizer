@@ -20,17 +20,21 @@ public class FolderScannerService
         ".mpg", ".mpeg", ".ts", ".m2ts", ".3gp", ".ogv"
     };
 
-    private readonly LibVLC _libVlc;
+    // LibVLC se resuelve de forma perezosa (se inicializa en segundo plano al arrancar): el primer
+    // escaneo espera a que este listo. Una vez resuelto queda cacheado.
+    private readonly Func<Task<LibVLC>> _libVlcProvider;
+    private LibVLC? _libVlc;
     private readonly ThumbnailService _thumbnailService;
 
-    public FolderScannerService(LibVLC libVlc, ThumbnailService thumbnailService)
+    public FolderScannerService(Func<Task<LibVLC>> libVlcProvider, ThumbnailService thumbnailService)
     {
-        _libVlc = libVlc;
+        _libVlcProvider = libVlcProvider;
         _thumbnailService = thumbnailService;
     }
 
     public async Task<List<Video>> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null)
     {
+        _libVlc ??= await _libVlcProvider();
         var addedVideos = new List<Video>();
 
         var files = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
@@ -109,7 +113,7 @@ public class FolderScannerService
 
     private async Task<long> GetDurationMsAsync(string filePath)
     {
-        using var media = new Media(_libVlc, new Uri(filePath));
+        using var media = new Media(_libVlc!, new Uri(filePath));
         await media.Parse(MediaParseOptions.ParseLocal);
         return media.Duration;
     }

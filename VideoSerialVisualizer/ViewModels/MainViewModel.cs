@@ -18,6 +18,8 @@ namespace VideoSerialVisualizer.ViewModels;
 public partial class MainViewModel : ObservableObject, IDisposable
 {
     private LibVLC? _libVlc;
+    private Task<LibVLC>? _libVlcTask;
+    private Task? _playerReadyTask;
 
     [ObservableProperty]
     private object? currentViewModel;
@@ -40,13 +42,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public async Task InitializeAsync()
     {
-        LoadingMessage = Loc.I["Startup_Player"];
-        await Task.Run(() =>
+        // LibVLC se inicializa en SEGUNDO PLANO y NO se espera aca: la pantalla de Explorar no lo
+        // necesita (solo lee la base y las miniaturas de disco). Sacarlo del camino critico hace que
+        // la app muestre contenido bastante antes (medido: ~200 ms en tibio, ~560 ms en frio, que es
+        // lo que tardaba en escanear los 322 plugins de VLC). Se espera recien cuando hace falta:
+        // escanear una carpeta (FolderScannerService), generar miniaturas/portadas (ThumbnailService)
+        // o reproducir (PlayerViewModel, ver InitializePlayerAsync).
+        _libVlcTask = Task.Run(() =>
         {
             Core.Initialize();
             // Se desactiva la decodificacion por hardware: es la causa mas comun de crashes
             // nativos de LibVLC con ciertos drivers de GPU/codecs (no recuperable con try/catch).
-            _libVlc = new LibVLC("--avcodec-hw=none");
+            return new LibVLC("--avcodec-hw=none");
         });
 
         LoadingMessage = Loc.I["Startup_Database"];
@@ -62,24 +69,38 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
         }
 
-        var thumbnailService = new ThumbnailService(_libVlc!);
-        var scannerService = new FolderScannerService(_libVlc!, thumbnailService);
+        // Los servicios que dependen de LibVLC lo resuelven de forma perezosa (esperan _libVlcTask
+        // recien al usarlo), asi se construyen sin bloquear el arranque.
+        var thumbnailService = new ThumbnailService(GetLibVlcAsync);
+        var scannerService = new FolderScannerService(GetLibVlcAsync, thumbnailService);
         var progressTracker = new ProgressTrackerService();
         var markerService = new VideoMarkerService();
 
         FoldersViewModel = new FoldersViewModel(scannerService, OpenFolder);
         LibraryViewModel = new LibraryViewModel(OpenPlayer, BackToFolders);
-        PlayerViewModel = new PlayerViewModel(_libVlc!, progressTracker, markerService, thumbnailService, BackToLibrary);
 
         OnPropertyChanged(nameof(FoldersViewModel));
         OnPropertyChanged(nameof(LibraryViewModel));
-        OnPropertyChanged(nameof(PlayerViewModel));
 
         LoadingMessage = Loc.I["Startup_Library"];
-        await FoldersViewModel.InitializeAsync();
+        await FoldersViewModel.InitializeAsync(); // no usa LibVLC
 
         CurrentViewModel = FoldersViewModel;
-        IsLoading = false;
+        IsLoading = false; // Explorar ya visible, sin haber esperado a LibVLC
+
+        // El reproductor SI necesita LibVLC en su constructor (crea un MediaPlayer), asi que se arma
+        // en cuanto LibVLC termina (en segundo plano). Para cuando el usuario navegue hasta un video
+        // ya suele estar listo; si no, OpenPlayer espera esta tarea.
+        _playerReadyTask = InitializePlayerAsync(progressTracker, markerService, thumbnailService);
+    }
+
+    private Task<LibVLC> GetLibVlcAsync() => _libVlcTask!;
+
+    private async Task InitializePlayerAsync(ProgressTrackerService progressTracker, VideoMarkerService markerService, ThumbnailService thumbnailService)
+    {
+        _libVlc = await _libVlcTask!;
+        PlayerViewModel = new PlayerViewModel(_libVlc, progressTracker, markerService, thumbnailService, BackToLibrary);
+        OnPropertyChanged(nameof(PlayerViewModel));
     }
 
     private async void OpenFolder(string folderPath)
@@ -101,6 +122,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private async void OpenPlayer(Video video)
     {
+        // El reproductor puede no estar armado todavia si LibVLC aun se esta inicializando (arranque
+        // en frio). Se espera aca; en la practica, para cuando el usuario llego hasta un video ya
+        // esta listo.
+        if (_playerReadyTask is not null)
+            await _playerReadyTask;
+
+        if (PlayerViewModel is null)
+            return;
+
         // Mostrar primero el reproductor para que PlayerView se cargue y registre su ventana de
         // video (Hwnd). Se espera a la prioridad Loaded del Dispatcher para garantizar que ese
         // registro ya ocurrio ANTES de reproducir; de lo contrario LibVLC abre su propia ventana.
@@ -118,6 +148,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         PlayerViewModel?.SaveAndDispose();
-        _libVlc?.Dispose();
+
+        // Si se cierra durante el arranque (antes de que el reproductor se arme), _libVlc puede ser
+        // null pero la tarea de fondo ya haber creado la instancia: se libera igual.
+        var vlc = _libVlc ?? (_libVlcTask is { IsCompletedSuccessfully: true } t ? t.Result : null);
+        vlc?.Dispose();
     }
 }

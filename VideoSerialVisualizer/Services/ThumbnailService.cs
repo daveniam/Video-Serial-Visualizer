@@ -28,7 +28,11 @@ public class ThumbnailService
     // el decoder no resuelve bien, pero otro punto si.
     private static readonly double[] SnapshotPositions = { 0.5, 0.35, 0.65, 0.2 };
 
-    private readonly LibVLC _libVlc;
+    // LibVLC se resuelve de forma perezosa: en el arranque se inicializa en segundo plano (fuera del
+    // camino critico), asi que la primera miniatura/portada espera a que este listo. Una vez resuelto
+    // queda cacheado en _libVlc.
+    private readonly Func<Task<LibVLC>> _libVlcProvider;
+    private LibVLC? _libVlc;
     private readonly IntPtr _hiddenRenderWindow;
 
     // Nombre historico "TutorialHub" mantenido a proposito: las rutas de las miniaturas quedan
@@ -38,9 +42,9 @@ public class ThumbnailService
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "TutorialHub", "Thumbnails");
 
-    public ThumbnailService(LibVLC libVlc)
+    public ThumbnailService(Func<Task<LibVLC>> libVlcProvider)
     {
-        _libVlc = libVlc;
+        _libVlcProvider = libVlcProvider;
         Directory.CreateDirectory(ThumbnailDirectory);
 
         // LibVLC necesita una ventana de destino para decodificar/renderizar el video.
@@ -58,6 +62,7 @@ public class ThumbnailService
 
     public async Task<ThumbnailResult> GenerateThumbnailAsync(int videoId, string videoPath)
     {
+        _libVlc ??= await _libVlcProvider();
         var outputPath = Path.Combine(ThumbnailDirectory, $"{videoId}.jpg");
 
         try
@@ -81,6 +86,7 @@ public class ThumbnailService
     /// </summary>
     public async Task<bool> CaptureAtPositionAsync(string videoPath, double positionFraction, string outputPath)
     {
+        _libVlc ??= await _libVlcProvider();
         try
         {
             return await CaptureAtCoreAsync(videoPath, Math.Clamp(positionFraction, 0, 1), outputPath);
@@ -94,8 +100,8 @@ public class ThumbnailService
 
     private async Task<bool> CaptureAtCoreAsync(string videoPath, double positionFraction, string outputPath)
     {
-        using var media = new Media(_libVlc, new Uri(videoPath));
-        using var mediaPlayer = new MediaPlayer(_libVlc) { Volume = 0 };
+        using var media = new Media(_libVlc!, new Uri(videoPath));
+        using var mediaPlayer = new MediaPlayer(_libVlc!) { Volume = 0 };
 
         if (_hiddenRenderWindow != IntPtr.Zero)
             mediaPlayer.Hwnd = _hiddenRenderWindow;
@@ -159,8 +165,8 @@ public class ThumbnailService
 
     private async Task<(bool Ok, long DurationMs)> CaptureFrameAsync(string videoPath, string outputPath)
     {
-        using var media = new Media(_libVlc, new Uri(videoPath));
-        using var mediaPlayer = new MediaPlayer(_libVlc) { Volume = 0 };
+        using var media = new Media(_libVlc!, new Uri(videoPath));
+        using var mediaPlayer = new MediaPlayer(_libVlc!) { Volume = 0 };
 
         if (_hiddenRenderWindow != IntPtr.Zero)
             mediaPlayer.Hwnd = _hiddenRenderWindow;
