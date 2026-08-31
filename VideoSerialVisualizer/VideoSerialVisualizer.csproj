@@ -81,6 +81,10 @@
          binarios nativos de FFmpeg: esos se cablean aparte (build a medida de FFmpeg 7.x shared).
          Ver THIRD-PARTY-NOTICES.md. -->
     <PackageReference Include="FFMediaToolkit" Version="4.8.1" />
+    <!-- Virtualizacion del layout tipo wrap en Explorar y la Biblioteca (WPF no la trae de fabrica):
+         solo se arman las tarjetas visibles, asi grupos con muchos videos abren fluido. MIT, ver
+         THIRD-PARTY-NOTICES.md. -->
+    <PackageReference Include="VirtualizingWrapPanel" Version="2.5.4" />
   </ItemGroup>
 
   <ItemGroup>
@@ -112,8 +116,7 @@
        ~38 MB juntas. El comodin cubre el sufijo de version (avcodec-61, -62, ...) para que un
        cambio de version de FFmpeg no rompa silenciosamente la copia. -->
   <ItemGroup>
-    <Content Include="..\ffmpeg\avcodec-*.dll;..\ffmpeg\avformat-*.dll;..\ffmpeg\avutil-*.dll;..\ffmpeg\swscale-*.dll;..\ffmpeg\swresample-*.dll"
-             Link="ffmpeg\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\ffmpeg\avcodec-*.dll;..\ffmpeg\avformat-*.dll;..\ffmpeg\avutil-*.dll;..\ffmpeg\swscale-*.dll;..\ffmpeg\swresample-*.dll" Link="ffmpeg\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -5,6 +5,7 @@
         xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              mc:Ignorable="d"
              Background="{StaticResource BgPrimaryBrush}"
              d:DataContext="{d:DesignInstance Type=vm:FoldersViewModel}">
@@ -95,17 +96,10 @@
             </Grid>
         </StackPanel>
 
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
-            <WrapPanel Orientation="Horizontal">
-
-                <!-- Tarjetas de carpetas -->
-                <ItemsControl ItemsSource="{Binding FolderCards}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
+        <!-- Tarjetas de carpetas. VirtualizingItemsControl solo arma las tarjetas VISIBLES (y scrollea
+             solo, sin ScrollViewer aparte), asi Explorar sigue fluido con cientos de grupos. -->
+        <vwp:VirtualizingItemsControl Grid.Row="3" ItemsSource="{Binding FolderCards}">
+                    <vwp:VirtualizingItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:FolderCardViewModel}">
                             <Border Width="240" Height="190" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"
                                     BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True"
@@ -165,9 +159,7 @@
                                 </Grid>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </WrapPanel>
-        </ScrollViewer>
+                    </vwp:VirtualizingItemsControl.ItemTemplate>
+        </vwp:VirtualizingItemsControl>
     </Grid>
 </UserControl>

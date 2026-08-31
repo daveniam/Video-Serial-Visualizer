@@ -3,8 +3,6 @@
 // Software libre, sin garantia alguna. Ver LICENSE para los terminos completos.
 
 using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
@@ -76,27 +74,44 @@ public partial class LibraryViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
 
+    /// <summary>Umbral antes de mostrar la ruedita al abrir un grupo.</summary>
+    private const int SpinnerDelayMs = 1000;
+
     /// <summary>
-    /// Entra al grupo mostrando la ruedita y carga con ella girando. El truco esta en el orden:
-    /// primero se prende la ruedita y se CEDE un cuadro (prioridad Background corre despues del
-    /// render) para que la vista + la ruedita se dibujen ANTES del trabajo pesado. Armar las tarjetas
-    /// bloquea el hilo de UI, pero la animacion de la ruedita corre en el hilo de composicion, asi
-    /// sigue girando durante ese bloqueo en vez de dejar la vista congelada. Se apaga al terminar
-    /// (tras otro ciclo Background, que corre despues del layout de las tarjetas).
+    /// Carga el grupo mostrando la ruedita SOLO si tarda mas de 1s. Con la grilla virtualizada armar
+    /// las tarjetas ya no bloquea el hilo de UI (solo se realizan las visibles), asi que entrar es
+    /// casi instantaneo y este contador rara vez llega a dispararse: un contador arranca en paralelo
+    /// y, si la carga termina antes, se cancela y la ruedita nunca aparece (sin parpadeo); si algo es
+    /// genuinamente lento (p.ej. una consulta grande), se prende y se apaga al terminar.
     /// </summary>
     public async Task RefreshWithSpinnerAsync()
     {
-        IsLoading = true;
-        await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+        using var loaded = new CancellationTokenSource();
+        var spinnerDelay = ShowSpinnerAfterDelayAsync(loaded.Token);
 
         try
         {
             await RefreshAsync();
-            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
         }
         finally
         {
+            loaded.Cancel();
             IsLoading = false;
+        }
+
+        await spinnerDelay; // observa la tarea del contador (ya cancelada) para no dejarla suelta
+    }
+
+    private async Task ShowSpinnerAfterDelayAsync(CancellationToken cancelWhenLoaded)
+    {
+        try
+        {
+            await Task.Delay(SpinnerDelayMs, cancelWhenLoaded);
+            IsLoading = true; // seguimos cargando al pasar el umbral
+        }
+        catch (TaskCanceledException)
+        {
+            // La carga termino antes del umbral: la ruedita no llega a mostrarse.
         }
     }
 

@@ -94,6 +94,16 @@ Analizador de Markdown (CommonMark). Convierte el texto de las etiquetas de line
 Renderiza el documento de Markdig como un FlowDocument de WPF, para la vista previa de las
 etiquetas de linea de tiempo.
 
+## VirtualizingWrapPanel — Sebastian Bäumlisberger
+
+- **Versión:** 2.5.4
+- **Copyright:** Copyright (c) sbaeumlisberger
+- **Sitio:** https://github.com/sbaeumlisberger/VirtualizingWrapPanel
+- **Licencia:** MIT (texto y avisos de copyright en `licenses/MIT.txt`)
+
+Panel de WPF que virtualiza el layout tipo "wrap": solo arma las tarjetas visibles. Se usa en
+Explorar y en la Biblioteca para que abrir grupos con muchos videos sea fluido.
+
 ## FFmpeg (binarios nativos) — proyecto FFmpeg
 
 - **Componentes:** `avcodec-61.dll`, `avformat-61.dll`, `avutil-59.dll`, `swscale-8.dll`,

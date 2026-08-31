@@ -5,6 +5,7 @@
         xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              mc:Ignorable="d"
              Background="{StaticResource BgPrimaryBrush}"
              d:DataContext="{d:DesignInstance Type=vm:LibraryViewModel}">
@@ -93,16 +94,11 @@
             </TextBlock.Style>
         </TextBlock>
 
-        <ScrollViewer Grid.Row="3" Margin="0,16,0,0" VerticalScrollBarVisibility="Auto">
-            <Grid>
-                <!-- Vista en cuadricula -->
-                <ItemsControl ItemsSource="{Binding Videos}" Visibility="{Binding IsListView, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
+        <Grid Grid.Row="3" Margin="0,16,0,0">
+                <!-- Vista en cuadricula: virtualizada (solo arma las tarjetas visibles y scrollea sola),
+                     asi abrir grupos con muchos videos es fluido. -->
+                <vwp:VirtualizingItemsControl ItemsSource="{Binding Videos}" Visibility="{Binding IsListView, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                    <vwp:VirtualizingItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:VideoCardViewModel}">
                             <Border Width="240" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"
                                     BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True">
@@ -147,11 +143,14 @@
                                 </Grid>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    </vwp:VirtualizingItemsControl.ItemTemplate>
+                </vwp:VirtualizingItemsControl>
 
-                <!-- Vista en lista -->
-                <ItemsControl ItemsSource="{Binding Videos}" Visibility="{Binding IsListView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Vista en lista: en su propio ScrollViewer (modo opcional, filas mas livianas; se
+                     deja sin virtualizar por ahora). -->
+                <ScrollViewer Visibility="{Binding IsListView, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Videos}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:VideoCardViewModel}">
                             <Border Margin="0,0,0,10" CornerRadius="8" Background="{StaticResource BgSurfaceBrush}"
@@ -210,8 +209,8 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </Grid>
-        </ScrollViewer>
+                </ScrollViewer>
+        </Grid>
 
         <!-- Ruedita de carga sobre el area de contenido. Solo se muestra si abrir el grupo tarda mas
              de 1s (ver LibraryViewModel.RefreshWithSpinnerAsync); en grupos rapidos no aparece. La
