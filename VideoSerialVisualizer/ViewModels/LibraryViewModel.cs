@@ -3,6 +3,8 @@
 // Software libre, sin garantia alguna. Ver LICENSE para los terminos completos.
 
 using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +32,14 @@ public partial class LibraryViewModel : ObservableObject
 
     [ObservableProperty]
     private bool isListView;
+
+    /// <summary>Muestra la ruedita de carga. Solo se prende si abrir el grupo tarda mas de 1s (ver
+    /// RefreshWithSpinnerAsync), asi los grupos rapidos no parpadean.</summary>
+    [ObservableProperty]
+    private bool isLoading;
+
+    /// <summary>Umbral antes de mostrar la ruedita al abrir un grupo.</summary>
+    private const int SpinnerDelayMs = 1000;
 
     public LibraryViewModel(Action<Video> openVideo, Action goBack)
     {
@@ -69,6 +79,45 @@ public partial class LibraryViewModel : ObservableObject
     private void SetListView() => IsListView = true;
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
+
+    /// <summary>
+    /// Carga el grupo mostrando la ruedita SOLO si tarda mas de 1s. Un contador arranca en paralelo:
+    /// si la carga termina antes, se cancela y la ruedita nunca aparece (grupos rapidos, sin
+    /// parpadeo); si tarda mas, se prende y se apaga al terminar. Se espera ademas a una devolucion
+    /// de control en prioridad Background (corre despues del layout), asi la ruedita cubre tambien el
+    /// armado de las tarjetas y no solo la consulta a la base.
+    /// </summary>
+    public async Task RefreshWithSpinnerAsync()
+    {
+        using var loaded = new CancellationTokenSource();
+        var spinnerDelay = ShowSpinnerAfterDelayAsync(loaded.Token);
+
+        try
+        {
+            await RefreshAsync();
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+        }
+        finally
+        {
+            loaded.Cancel();
+            IsLoading = false;
+        }
+
+        await spinnerDelay; // observa la tarea del contador (ya cancelada) para no dejarla suelta
+    }
+
+    private async Task ShowSpinnerAfterDelayAsync(CancellationToken cancelWhenLoaded)
+    {
+        try
+        {
+            await Task.Delay(SpinnerDelayMs, cancelWhenLoaded);
+            IsLoading = true; // seguimos cargando al pasar el umbral
+        }
+        catch (TaskCanceledException)
+        {
+            // La carga termino antes del umbral: la ruedita no llega a mostrarse.
+        }
+    }
 
     public async Task RefreshAsync()
     {

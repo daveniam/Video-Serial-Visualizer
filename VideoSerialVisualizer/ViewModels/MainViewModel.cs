@@ -111,7 +111,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         LibraryViewModel!.SetScope(folderPath, folderName);
         CurrentViewModel = LibraryViewModel;
-        await LibraryViewModel.RefreshAsync();
+        await LibraryViewModel.RefreshWithSpinnerAsync();
     }
 
     private async void BackToFolders()
@@ -142,7 +142,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async void BackToLibrary()
     {
         CurrentViewModel = LibraryViewModel;
-        await LibraryViewModel!.RefreshAsync();
+        await LibraryViewModel!.RefreshWithSpinnerAsync();
     }
 
     public void Dispose()
