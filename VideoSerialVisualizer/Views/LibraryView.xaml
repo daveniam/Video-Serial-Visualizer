@@ -98,6 +98,11 @@
                 <!-- Vista en cuadricula: virtualizada (solo arma las tarjetas visibles y scrollea sola),
                      asi abrir grupos con muchos videos es fluido. -->
                 <vwp:VirtualizingItemsControl ItemsSource="{Binding Videos}" Visibility="{Binding IsListView, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                    <vwp:VirtualizingItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None" />
+                        </ItemsPanelTemplate>
+                    </vwp:VirtualizingItemsControl.ItemsPanel>
                     <vwp:VirtualizingItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:VideoCardViewModel}">
                             <Border Width="240" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"

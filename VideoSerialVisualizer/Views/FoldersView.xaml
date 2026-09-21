@@ -99,6 +99,11 @@
         <!-- Tarjetas de carpetas. VirtualizingItemsControl solo arma las tarjetas VISIBLES (y scrollea
              solo, sin ScrollViewer aparte), asi Explorar sigue fluido con cientos de grupos. -->
         <vwp:VirtualizingItemsControl Grid.Row="3" ItemsSource="{Binding FolderCards}">
+                    <vwp:VirtualizingItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None" />
+                        </ItemsPanelTemplate>
+                    </vwp:VirtualizingItemsControl.ItemsPanel>
                     <vwp:VirtualizingItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:FolderCardViewModel}">
                             <Border Width="240" Height="190" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"
