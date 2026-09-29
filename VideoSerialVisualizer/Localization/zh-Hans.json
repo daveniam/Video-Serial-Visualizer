@@ -18,6 +18,7 @@
   "Explore_RenameGroup": "重命名分组",
   "Explore_AssignCategory": "指定分类",
   "Explore_DeleteGroup": "删除分组",
+  "Explore_WatchedProgress": "已看 {0}/{1}",
 
   "Library_Empty": "此区域没有视频。",
   "Library_GridView": "网格视图",

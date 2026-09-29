@@ -18,6 +18,7 @@
   "Explore_RenameGroup": "Gruppe umbenennen",
   "Explore_AssignCategory": "Kategorie zuweisen",
   "Explore_DeleteGroup": "Gruppe löschen",
+  "Explore_WatchedProgress": "{0}/{1} gesehen",
 
   "Library_Empty": "Keine Videos in diesem Bereich.",
   "Library_GridView": "Rasteransicht",

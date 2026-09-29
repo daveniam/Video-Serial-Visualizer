@@ -160,6 +160,15 @@
                                                    TextTrimming="CharacterEllipsis" ToolTip="{Binding FolderPath}" />
                                         <TextBlock Text="{Binding InfoText}" Foreground="{StaticResource TextSecondaryBrush}"
                                                    FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+
+                                        <!-- Cuanto del grupo ya se vio (videos completados / total), mismo estilo que la
+                                             barra de progreso de una tarjeta de video individual. -->
+                                        <Grid Height="4" Margin="0,8,0,0" Background="{StaticResource BgSurfaceAltBrush}"
+                                              ToolTip="{Binding WatchedTooltip}">
+                                            <Rectangle Height="4" HorizontalAlignment="Left"
+                                                       Fill="{Binding AllWatched, Converter={StaticResource CompletadoToBrushConverter}}"
+                                                       Width="{Binding WatchedPercent, Converter={StaticResource PercentToWidthConverter}, ConverterParameter=216}" />
+                                        </Grid>
                                     </StackPanel>
                                 </Grid>
                             </Border>

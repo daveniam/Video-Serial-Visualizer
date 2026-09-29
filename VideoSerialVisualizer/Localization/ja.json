@@ -18,6 +18,7 @@
   "Explore_RenameGroup": "グループ名を変更",
   "Explore_AssignCategory": "カテゴリを割り当て",
   "Explore_DeleteGroup": "グループを削除",
+  "Explore_WatchedProgress": "{0}/{1} 視聴済み",
 
   "Library_Empty": "このセクションに動画はありません。",
   "Library_GridView": "グリッド表示",

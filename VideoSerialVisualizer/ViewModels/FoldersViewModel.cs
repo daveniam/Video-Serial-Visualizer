@@ -373,6 +373,13 @@ public partial class FoldersViewModel : ObservableObject
             .Select(g => new { FolderPath = g.Key, Count = g.Count(), TotalMs = g.Sum(v => v.DuracionMs) })
             .ToListAsync();
 
+        // Cuantos videos completados tiene cada carpeta, para la linea de progreso del grupo.
+        var watchedByFolder = await db.Videos.AsNoTracking()
+            .Join(db.Progress.AsNoTracking().Where(p => p.Completado), v => v.Id, p => p.VideoId, (v, p) => v.CarpetaOrigen)
+            .GroupBy(f => f)
+            .Select(g => new { FolderPath = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.FolderPath, g => g.Count);
+
         // Para la caratula solo hacen falta los videos que TIENEN miniatura, y solo tres columnas
         // (no la entidad completa): la eleccion del "ultimo" usa orden natural, que es logica C#.
         var thumbnailCandidates = await db.Videos.AsNoTracking()
@@ -431,7 +438,7 @@ public partial class FoldersViewModel : ObservableObject
                 return new FolderCardViewModel(
                     group.FolderPath, group.Count, group.TotalMs, effectiveThumbnail,
                     category?.DisplayName, category?.Favorito ?? false,
-                    categoryIds ?? Array.Empty<int>());
+                    categoryIds ?? Array.Empty<int>(), watchedByFolder.GetValueOrDefault(group.FolderPath));
             })
             .ToList();
 

@@ -18,6 +18,17 @@ public partial class FolderCardViewModel : ObservableObject
     public int VideoCount { get; }
     public long TotalDurationMs { get; }
     public string? ThumbnailPath { get; }
+    public int WatchedCount { get; }
+
+    /// <summary>Porcentaje de videos vistos del grupo (0-100), para la linea de progreso de la tarjeta.</summary>
+    public double WatchedPercent => VideoCount > 0 ? WatchedCount / (double)VideoCount * 100.0 : 0;
+
+    /// <summary>Todos los videos del grupo estan vistos: la linea de progreso se pinta en verde, igual
+    /// que "Completado" en la tarjeta de un video individual.</summary>
+    public bool AllWatched => VideoCount > 0 && WatchedCount == VideoCount;
+
+    /// <summary>Texto del tooltip de la linea de progreso ("3/12 vistos").</summary>
+    public string WatchedTooltip => string.Format(Loc.I["Explore_WatchedProgress"], WatchedCount, VideoCount);
 
     /// <summary>Linea bajo el nombre del grupo: cantidad de videos y, si se conoce, la duracion total
     /// ("12 video(s)  ·  8h 30min"). La duracion se omite si es 0 (todavia sin escanear o desconocida).</summary>
@@ -69,7 +80,7 @@ public partial class FolderCardViewModel : ObservableObject
     [ObservableProperty]
     private ImageSource? thumbnailImage;
 
-    public FolderCardViewModel(string folderPath, int videoCount, long totalDurationMs, string? thumbnailPath, string? customDisplayName, bool favorito, IReadOnlyCollection<int> categoryIds)
+    public FolderCardViewModel(string folderPath, int videoCount, long totalDurationMs, string? thumbnailPath, string? customDisplayName, bool favorito, IReadOnlyCollection<int> categoryIds, int watchedCount)
     {
         FolderPath = folderPath;
 
@@ -83,6 +94,7 @@ public partial class FolderCardViewModel : ObservableObject
         displayName = string.IsNullOrWhiteSpace(customDisplayName) ? FolderName : customDisplayName;
         this.favorito = favorito;
         CategoryIds = categoryIds;
+        WatchedCount = watchedCount;
     }
 
     public async Task LoadThumbnailAsync()

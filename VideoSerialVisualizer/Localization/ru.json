@@ -18,6 +18,7 @@
   "Explore_RenameGroup": "Переименовать группу",
   "Explore_AssignCategory": "Назначить категорию",
   "Explore_DeleteGroup": "Удалить группу",
+  "Explore_WatchedProgress": "Просмотрено {0}/{1}",
 
   "Library_Empty": "В этом разделе нет видео.",
   "Library_GridView": "Сетка",
