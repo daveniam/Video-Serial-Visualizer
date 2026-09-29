@@ -37,14 +37,37 @@ public class FolderScannerService
         _libVlc ??= await _libVlcProvider();
         var addedVideos = new List<Video>();
 
-        var files = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
+        var allFiles = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
             .Where(f => VideoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
             .ToList();
+
+        // "._NombreOriginal.mp4": metadata "AppleDouble" que macOS deja junto al archivo real al
+        // copiar a un disco no-Mac (exFAT/NTFS). Pesan unos cientos de bytes y no tienen video
+        // adentro, asi que Media.Parse siempre da duracion 0 y nunca van a poder tener miniatura.
+        // Se descartan del escaneo, y si ya habian quedado cargados de un escaneo previo se borran.
+        var files = allFiles.Where(f => !IsAppleDoubleSidecar(f)).ToList();
+        var sidecarFiles = allFiles.Where(IsAppleDoubleSidecar).ToList();
 
         await using var db = new AppDbContext();
 
         var existingByPath = (await db.Videos.ToListAsync())
             .ToDictionary(v => v.RutaAbsoluta, StringComparer.OrdinalIgnoreCase);
+
+        if (sidecarFiles.Count > 0)
+        {
+            var junkVideos = sidecarFiles
+                .Where(f => existingByPath.ContainsKey(f))
+                .Select(f => existingByPath[f])
+                .ToList();
+
+            if (junkVideos.Count > 0)
+            {
+                db.Videos.RemoveRange(junkVideos);
+                await db.SaveChangesAsync();
+                foreach (var junk in junkVideos)
+                    existingByPath.Remove(junk.RutaAbsoluta);
+            }
+        }
 
         var newFiles = files.Where(f => !existingByPath.ContainsKey(f)).ToList();
 
@@ -110,6 +133,11 @@ public class FolderScannerService
     /// <summary>El video tiene una miniatura y su archivo sigue existiendo.</summary>
     private static bool HasThumbnail(Video v)
         => !string.IsNullOrEmpty(v.ThumbnailPath) && File.Exists(v.ThumbnailPath);
+
+    /// <summary>Detecta el metadata "AppleDouble" que macOS deja junto a cada archivo real al copiar
+    /// a un disco no-Mac: mismo nombre con el prefijo "._", sin video adentro.</summary>
+    private static bool IsAppleDoubleSidecar(string filePath)
+        => Path.GetFileName(filePath).StartsWith("._", StringComparison.Ordinal);
 
     private async Task<long> GetDurationMsAsync(string filePath)
     {

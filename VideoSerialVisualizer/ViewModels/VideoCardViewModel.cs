@@ -18,10 +18,20 @@ public partial class VideoCardViewModel : ObservableObject
     public string NombreArchivo => Video.NombreArchivo;
     public string CarpetaOrigen => Video.CarpetaOrigen;
     public string? ThumbnailPath => Video.ThumbnailPath;
-    public bool Completado { get; }
-    public double ProgressPercent { get; }
     public string DurationText { get; }
-    public string ProgressText { get; }
+
+    [ObservableProperty]
+    private bool completado;
+
+    [ObservableProperty]
+    private double progressPercent;
+
+    [ObservableProperty]
+    private string progressText = string.Empty;
+
+    /// <summary>Texto del item de menu "Marcar como visto"/"Marcar como no visto" (cambia con Completado).</summary>
+    [ObservableProperty]
+    private string toggleWatchedMenuText = string.Empty;
 
     [ObservableProperty]
     private ImageSource? thumbnailImage;
@@ -29,23 +39,31 @@ public partial class VideoCardViewModel : ObservableObject
     public VideoCardViewModel(Video video, WatchProgress? progress)
     {
         Video = video;
-        Completado = progress?.Completado ?? false;
         DurationText = TimeFormatter.Format(video.DuracionMs);
+        ApplyProgress(progress);
+    }
 
-        if (progress is null || video.DuracionMs <= 0)
-        {
-            ProgressPercent = 0;
-        }
-        else
-        {
-            ProgressPercent = Math.Clamp(progress.PosicionMs / (double)video.DuracionMs * 100.0, 0, 100);
-        }
+    /// <summary>
+    /// Recalcula el estado de progreso mostrado en la tarjeta. Se llama desde el constructor y de
+    /// nuevo despues de marcar/desmarcar como visto, para reflejar el cambio sin rearmar la tarjeta.
+    /// </summary>
+    public void ApplyProgress(WatchProgress? progress)
+    {
+        Completado = progress?.Completado ?? false;
+
+        ProgressPercent = progress is null || Video.DuracionMs <= 0
+            ? 0
+            : Math.Clamp(progress.PosicionMs / (double)Video.DuracionMs * 100.0, 0, 100);
 
         ProgressText = Completado
             ? Loc.I["Progress_Completed"]
             : ProgressPercent > 0
                 ? string.Format(Loc.I["Progress_Watched"], Math.Round(ProgressPercent))
                 : Loc.I["Progress_Unwatched"];
+
+        ToggleWatchedMenuText = Completado
+            ? Loc.I["Library_MarkUnwatched"]
+            : Loc.I["Library_MarkWatched"];
     }
 
     public async Task LoadThumbnailAsync()

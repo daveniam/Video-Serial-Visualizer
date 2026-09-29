@@ -98,6 +98,27 @@
                 </Setter>
             </Style>
 
+            <!-- Boton de abrir carpeta: mismo look que el de volver (cuadro redondeado gris, resalta
+                 con el color de acento al pasar el mouse), pero con un icono de carpeta. -->
+            <Style x:Key="OpenFolderButtonStyle" TargetType="Button" BasedOn="{StaticResource PlainButtonStyle}">
+                <Setter Property="Width" Value="40" />
+                <Setter Property="Height" Value="40" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="OpenFolderBg" CornerRadius="8" Background="{StaticResource ControlSurfaceBrush}">
+                                <TextBlock Text="&#128193;" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="OpenFolderBg" Property="Background" Value="{StaticResource AccentBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="PillButtonStyle" TargetType="Button" BasedOn="{StaticResource PlainButtonStyle}">
                 <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                 <Setter Property="FontWeight" Value="SemiBold" />

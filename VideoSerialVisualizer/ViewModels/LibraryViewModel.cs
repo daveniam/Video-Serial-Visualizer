@@ -3,12 +3,14 @@
 // Software libre, sin garantia alguna. Ver LICENSE para los terminos completos.
 
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using VideoSerialVisualizer.Data;
 using VideoSerialVisualizer.Helpers;
 using VideoSerialVisualizer.Models;
+using VideoSerialVisualizer.Services;
 
 namespace VideoSerialVisualizer.ViewModels;
 
@@ -16,6 +18,7 @@ public partial class LibraryViewModel : ObservableObject
 {
     private readonly Action<Video> _openVideo;
     private readonly Action _goBack;
+    private readonly ProgressTrackerService _progressTracker = new();
     private List<VideoCardViewModel> _allVideos = new();
 
     private string? _folderFilter;
@@ -57,6 +60,16 @@ public partial class LibraryViewModel : ObservableObject
         _openVideo(card.Video);
     }
 
+    [RelayCommand]
+    private async Task ToggleWatchedAsync(VideoCardViewModel? card)
+    {
+        if (card is null)
+            return;
+
+        var progress = await _progressTracker.ToggleWatchedAsync(card.Id, card.Video.DuracionMs);
+        card.ApplyProgress(progress);
+    }
+
     /// <summary>
     /// Lista de reproduccion en el orden que ve el usuario (respeta el filtro de busqueda actual).
     /// La usa el reproductor para saber cual es el "siguiente" video.
@@ -65,6 +78,23 @@ public partial class LibraryViewModel : ObservableObject
 
     [RelayCommand]
     private void Back() => _goBack();
+
+    [RelayCommand]
+    private void OpenContainingFolder()
+    {
+        if (string.IsNullOrEmpty(_folderFilter))
+            return;
+
+        try
+        {
+            // UseShellExecute deja que Windows abra la carpeta en el Explorador.
+            Process.Start(new ProcessStartInfo(_folderFilter) { UseShellExecute = true });
+        }
+        catch
+        {
+            // Carpeta movida o borrada desde afuera de la app: no vale la pena molestar al usuario.
+        }
+    }
 
     [RelayCommand]
     private void SetGridView() => IsListView = false;

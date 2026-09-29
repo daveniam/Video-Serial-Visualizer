@@ -50,4 +50,48 @@ public class ProgressTrackerService
 
         await db.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Alterna el estado "visto" desde la grilla (sin reproductor de por medio). Marcar como visto deja
+    /// la posicion al final (igual que terminar de ver el video); desmarcar borra el progreso, que es
+    /// exactamente como el resto de la app representa "nunca se vio" (ver Video.Progress).
+    /// </summary>
+    public async Task<WatchProgress?> ToggleWatchedAsync(int videoId, long durationMs)
+    {
+        await using var db = new AppDbContext();
+
+        // Mismo resguardo que SaveProgressAsync: si el video ya no esta en la base, no hay nada que tocar.
+        if (!await db.Videos.AnyAsync(v => v.Id == videoId))
+            return null;
+
+        var progress = await db.Progress.FirstOrDefaultAsync(p => p.VideoId == videoId);
+
+        if (progress is { Completado: true })
+        {
+            db.Progress.Remove(progress);
+            await db.SaveChangesAsync();
+            return null;
+        }
+
+        if (progress is null)
+        {
+            progress = new WatchProgress
+            {
+                VideoId = videoId,
+                PosicionMs = durationMs,
+                Completado = true,
+                UltimaVezVisto = DateTime.Now
+            };
+            db.Progress.Add(progress);
+        }
+        else
+        {
+            progress.PosicionMs = durationMs;
+            progress.Completado = true;
+            progress.UltimaVezVisto = DateTime.Now;
+        }
+
+        await db.SaveChangesAsync();
+        return progress;
+    }
 }

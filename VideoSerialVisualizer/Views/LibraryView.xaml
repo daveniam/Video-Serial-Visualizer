@@ -24,6 +24,8 @@
                         VerticalAlignment="Center" ToolTip="{loc:Tr Library_BackToExplore}" />
                 <TextBlock Text="{Binding ScopeTitle}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
                            VerticalAlignment="Center" />
+                <Button Style="{StaticResource OpenFolderButtonStyle}" Command="{Binding OpenContainingFolderCommand}" Margin="14,0,0,0"
+                        VerticalAlignment="Center" ToolTip="{loc:Tr Library_OpenFolder}" />
             </StackPanel>
         </Grid>
 
@@ -106,7 +108,16 @@
                     <vwp:VirtualizingItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:VideoCardViewModel}">
                             <Border Width="240" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"
-                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True">
+                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True"
+                                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Border.ContextMenu>
+                                    <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
+                                        <MenuItem Header="{Binding PlacementTarget.DataContext.ToggleWatchedMenuText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Style="{StaticResource DarkMenuItemStyle}"
+                                                  Command="{Binding PlacementTarget.Tag.ToggleWatchedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="135" />
@@ -159,7 +170,16 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:VideoCardViewModel}">
                             <Border Margin="0,0,0,10" CornerRadius="8" Background="{StaticResource BgSurfaceBrush}"
-                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True">
+                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True"
+                                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Border.ContextMenu>
+                                    <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
+                                        <MenuItem Header="{Binding PlacementTarget.DataContext.ToggleWatchedMenuText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Style="{StaticResource DarkMenuItemStyle}"
+                                                  Command="{Binding PlacementTarget.Tag.ToggleWatchedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="72" />

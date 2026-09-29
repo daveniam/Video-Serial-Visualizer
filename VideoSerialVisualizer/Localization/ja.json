@@ -23,6 +23,9 @@
   "Library_GridView": "グリッド表示",
   "Library_ListView": "リスト表示",
   "Library_BackToExplore": "ライブラリに戻る",
+  "Library_MarkWatched": "視聴済みにする",
+  "Library_MarkUnwatched": "未視聴に戻す",
+  "Library_OpenFolder": "格納フォルダーを開く",
 
   "Player_BackToLibrary": "一覧に戻る",
   "Player_PlayPause": "再生 / 一時停止",
@@ -52,6 +55,11 @@
   "Cover_Capturing": "表紙を取得中…",
   "Cover_Set": "グループの表紙を更新しました",
   "Cover_Failed": "表紙を取得できませんでした",
+
+  "Thumbnail_TakeScreenshot": "サムネイル用に撮影",
+  "Thumbnail_Capturing": "サムネイルを撮影中…",
+  "Thumbnail_Set": "サムネイルを更新しました",
+  "Thumbnail_Failed": "サムネイルを撮影できませんでした",
   "Reference_Title": "リファレンス",
   "Reference_Toggle": "フローティング リファレンス ウィンドウ",
   "Reference_AlwaysOnTop": "常に手前に表示",

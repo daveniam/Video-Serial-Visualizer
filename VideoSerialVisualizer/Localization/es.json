@@ -23,6 +23,9 @@
   "Library_GridView": "Vista en cuadrícula",
   "Library_ListView": "Vista en lista",
   "Library_BackToExplore": "Volver a Explorar",
+  "Library_MarkWatched": "Marcar como visto",
+  "Library_MarkUnwatched": "Marcar como no visto",
+  "Library_OpenFolder": "Abrir carpeta contenedora",
 
   "Player_BackToLibrary": "Volver a la biblioteca",
   "Player_PlayPause": "Reproducir/Pausar",
@@ -52,6 +55,11 @@
   "Cover_Capturing": "Capturando portada…",
   "Cover_Set": "Portada del grupo actualizada",
   "Cover_Failed": "No se pudo capturar la portada",
+
+  "Thumbnail_TakeScreenshot": "Tomar captura para miniatura",
+  "Thumbnail_Capturing": "Capturando miniatura…",
+  "Thumbnail_Set": "Miniatura actualizada",
+  "Thumbnail_Failed": "No se pudo capturar la miniatura",
   "Reference_Title": "Referencia",
   "Reference_Toggle": "Ventana de referencia flotante",
   "Reference_AlwaysOnTop": "Siempre encima",

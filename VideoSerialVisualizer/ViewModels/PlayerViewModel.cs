@@ -430,11 +430,12 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     partial void OnIsWindowActiveChanged(bool value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
 
-    // --- Portada del grupo (clic derecho en la barra) ---
+    // --- Portada del grupo / miniatura del video (clic derecho en la barra) ---
     //
-    // El usuario elige un momento del video con clic derecho sobre la barra y lo fija como caratula
-    // del grupo. El punto (fraccion 0..1) se recuerda al abrir el menu contextual; el item del menu
-    // dispara la captura, que corre en un reproductor oculto aparte para no tocar la reproduccion.
+    // El usuario elige un momento del video con clic derecho sobre la barra. El punto (fraccion 0..1)
+    // se recuerda al abrir el menu contextual; desde ahi puede fijarlo como caratula del grupo o (si
+    // la miniatura automatica del escaneo fallo) como miniatura de este video puntual. Ambas capturas
+    // corren en un reproductor oculto aparte para no tocar la reproduccion.
 
     private double _pendingCoverFraction;
 
@@ -507,6 +508,57 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             TryDeleteCoverFile(oldCoverPath);
 
         ShowCoverFeedback(Loc.I["Cover_Set"]);
+    }
+
+    [RelayCommand]
+    private async Task TakeThumbnailAsync()
+    {
+        var video = CurrentVideo;
+        if (video is null)
+            return;
+
+        var videoPath = video.RutaAbsoluta;
+        var fraction = _pendingCoverFraction;
+        var oldThumbnailPath = video.ThumbnailPath;
+
+        ShowCoverFeedback(Loc.I["Thumbnail_Capturing"], autoHide: false);
+
+        // Mismo motivo que la portada: nombre unico por captura para que ThumbnailLoader (cache por
+        // ruta) no siga mostrando la miniatura vieja hasta reiniciar la app.
+        var stamp = DateTime.UtcNow.Ticks;
+        var newThumbnailPath = Path.Combine(ThumbnailService.ThumbnailDirectory, $"{video.Id}_{stamp}.jpg");
+
+        try
+        {
+            var ok = await _thumbnailService.CaptureAtPositionAsync(videoPath, fraction, newThumbnailPath);
+            if (!ok)
+            {
+                ShowCoverFeedback(Loc.I["Thumbnail_Failed"]);
+                return;
+            }
+
+            await using var db = new AppDbContext();
+            var dbVideo = await db.Videos.FirstOrDefaultAsync(v => v.Id == video.Id);
+            if (dbVideo is null)
+            {
+                ShowCoverFeedback(Loc.I["Thumbnail_Failed"]);
+                return;
+            }
+
+            dbVideo.ThumbnailPath = newThumbnailPath;
+            await db.SaveChangesAsync();
+            video.ThumbnailPath = newThumbnailPath;
+        }
+        catch
+        {
+            ShowCoverFeedback(Loc.I["Thumbnail_Failed"]);
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(oldThumbnailPath) && !string.Equals(oldThumbnailPath, newThumbnailPath, StringComparison.OrdinalIgnoreCase))
+            TryDeleteCoverFile(oldThumbnailPath);
+
+        ShowCoverFeedback(Loc.I["Thumbnail_Set"]);
     }
 
     private void ShowCoverFeedback(string text, bool autoHide = true)

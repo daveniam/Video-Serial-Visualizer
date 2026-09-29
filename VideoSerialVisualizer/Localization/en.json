@@ -23,6 +23,9 @@
   "Library_GridView": "Grid view",
   "Library_ListView": "List view",
   "Library_BackToExplore": "Back to Explore",
+  "Library_MarkWatched": "Mark as watched",
+  "Library_MarkUnwatched": "Mark as unwatched",
+  "Library_OpenFolder": "Open containing folder",
 
   "Player_BackToLibrary": "Back to library",
   "Player_PlayPause": "Play/Pause",
@@ -52,6 +55,11 @@
   "Cover_Capturing": "Capturing cover…",
   "Cover_Set": "Group cover updated",
   "Cover_Failed": "Couldn't capture the cover",
+
+  "Thumbnail_TakeScreenshot": "Take screenshot for thumbnail",
+  "Thumbnail_Capturing": "Capturing thumbnail…",
+  "Thumbnail_Set": "Thumbnail updated",
+  "Thumbnail_Failed": "Couldn't capture the thumbnail",
   "Reference_Title": "Reference",
   "Reference_Toggle": "Floating reference window",
   "Reference_AlwaysOnTop": "Always on top",

@@ -23,6 +23,9 @@
   "Library_GridView": "Сетка",
   "Library_ListView": "Список",
   "Library_BackToExplore": "Назад к обзору",
+  "Library_MarkWatched": "Отметить как просмотренное",
+  "Library_MarkUnwatched": "Отметить как непросмотренное",
+  "Library_OpenFolder": "Открыть содержащую папку",
 
   "Player_BackToLibrary": "Назад в библиотеку",
   "Player_PlayPause": "Воспроизведение/Пауза",
@@ -52,6 +55,11 @@
   "Cover_Capturing": "Создание обложки…",
   "Cover_Set": "Обложка группы обновлена",
   "Cover_Failed": "Не удалось создать обложку",
+
+  "Thumbnail_TakeScreenshot": "Сделать снимок для миниатюры",
+  "Thumbnail_Capturing": "Создание миниатюры…",
+  "Thumbnail_Set": "Миниатюра обновлена",
+  "Thumbnail_Failed": "Не удалось создать миниатюру",
   "Reference_Title": "Референс",
   "Reference_Toggle": "Плавающее окно референса",
   "Reference_AlwaysOnTop": "Поверх всех окон",

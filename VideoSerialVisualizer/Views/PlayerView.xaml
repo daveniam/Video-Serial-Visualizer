@@ -356,9 +356,12 @@
                             helpers:ScrubBar.EndCommand="{Binding ScrubEndCommand}"
                             helpers:ScrubBar.RightDownCommand="{Binding RecordCoverPointCommand}">
                         <Border.ContextMenu>
-                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                <MenuItem Header="{loc:Tr Cover_SetAsGroupCover}"
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                         Style="{StaticResource DarkContextMenuStyle}">
+                                <MenuItem Header="{loc:Tr Cover_SetAsGroupCover}" Style="{StaticResource DarkMenuItemStyle}"
                                           Command="{Binding SetGroupCoverCommand}" />
+                                <MenuItem Header="{loc:Tr Thumbnail_TakeScreenshot}" Style="{StaticResource DarkMenuItemStyle}"
+                                          Command="{Binding TakeThumbnailCommand}" />
                             </ContextMenu>
                         </Border.ContextMenu>
                     </Border>
