@@ -38,7 +38,16 @@ public partial class PlayerView : UserControl
         // Acceder a Handle fuerza la creacion de la ventana nativa; se la pasamos al MediaPlayer
         // ANTES de reproducir (MainViewModel espera a este Loaded), asi LibVLC pinta aca dentro.
         if (DataContext is PlayerViewModel vm)
+        {
             vm.AttachVideoSurface(_videoPanel.Handle);
+
+            // LibVLC le roba el foco de Windows a su ventana nativa de video al EMPEZAR a reproducir,
+            // no solo cuando se la clickea (igual motivo que OnVideoClicked mas abajo). Sin reclamarlo
+            // de nuevo aca, los KeyBinding (Space, flechas, etc.) quedan muertos hasta el primer clic
+            // manual sobre el video. Se repite en cada "Playing" (tambien al reanudar o encadenar con
+            // el siguiente video) porque cada arranque de reproduccion puede volver a robarlo.
+            vm.MediaPlayer.Playing += OnMediaPlayerPlaying;
+        }
 
         // Se sigue si la ventana esta activa: el overlay de play (Popup) se oculta cuando no lo
         // esta, para que no quede flotando encima de otras aplicaciones.
@@ -128,10 +137,17 @@ public partial class PlayerView : UserControl
         }
     }
 
+    // El evento llega desde el hilo de LibVLC; se marshalea al hilo de UI antes de tocar el foco.
+    private void OnMediaPlayerPlaying(object? sender, EventArgs e)
+        => Dispatcher.BeginInvoke(() => Keyboard.Focus(this));
+
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         if (DataContext is PlayerViewModel vm)
+        {
             vm.DetachVideoSurface();
+            vm.MediaPlayer.Playing -= OnMediaPlayerPlaying;
+        }
 
         // Al salir del reproductor estando en pantalla completa, se restaura la ventana para no dejar
         // la biblioteca/explorar en modo borderless.

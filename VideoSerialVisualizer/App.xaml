@@ -173,6 +173,11 @@
                 <Setter Property="Width" Value="36" />
                 <Setter Property="Height" Value="36" />
                 <Setter Property="Opacity" Value="0.85" />
+                <!-- Sin foco de teclado: si un boton de la barra se lo quedara al hacer clic, los
+                     atajos (Space, flechas, M...) declarados en PlayerView.xaml.InputBindings dejarian
+                     de disparar hasta reclamarlo de nuevo (solo pasa al cargar la vista o alternar
+                     pantalla completa). El clic con el mouse sigue andando igual sin foco. -->
+                <Setter Property="Focusable" Value="False" />
                 <Style.Triggers>
                     <Trigger Property="IsMouseOver" Value="True">
                         <Setter Property="Opacity" Value="1" />

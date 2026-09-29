@@ -117,7 +117,7 @@
                    Opened="PlayOverlayPopup_Opened"
                    IsOpen="{Binding IsPlayOverlayVisible, Mode=OneWay}">
                 <Button Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayPauseCommand}"
-                        ToolTip="{loc:Tr Player_PlayPause}" Width="72" Height="72">
+                        ToolTip="{loc:Tr Player_PlayPause}" Width="72" Height="72" Focusable="False">
                     <Grid>
                         <Ellipse Fill="#B0000000" />
                         <Ellipse Stroke="#40FFFFFF" StrokeThickness="1" />
@@ -214,7 +214,7 @@
                                     Visibility="{Binding HasSegment, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="{Binding SegmentRangeText}" Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="12" VerticalAlignment="Center" />
-                            <Button Style="{StaticResource PlainButtonStyle}" Margin="6,0,0,0" Padding="4"
+                            <Button Style="{StaticResource PlainButtonStyle}" Margin="6,0,0,0" Padding="4" Focusable="False"
                                     Command="{Binding ClearSegmentCommand}" ToolTip="{loc:Tr Player_ClearSegment}">
                                 <TextBlock Text="&#10005;" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" />
                             </Button>
@@ -546,7 +546,7 @@
 
                     <!-- Aparece en los ultimos 30s: el relleno avanza hasta que el video termina
                          y encadena solo con el siguiente. Clic = pasar al siguiente ya mismo. -->
-                    <Button Grid.Column="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    <Button Grid.Column="9" HorizontalAlignment="Right" VerticalAlignment="Center" Focusable="False"
                             Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayNextCommand}"
                             ToolTip="{loc:Tr Player_NextVideo}"
                             Visibility="{Binding IsNextFillVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
