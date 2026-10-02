@@ -112,6 +112,9 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     /// <summary>Render del video como imagen WPF (modo animador). Null cuando dibuja LibVLC.</summary>
     private IVlcFrameRenderer? _frameRenderer;
 
+    /// <summary>Espacio de color del video actual (EXPERIMENTAL d3dimage). Null si no se pudo leer.</summary>
+    private VideoColorInfo? _videoColor;
+
     private int _videoPixelWidth;
     private int _videoPixelHeight;
 
@@ -835,7 +838,14 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             // falta el tamano del video para configurar el render por callbacks. De paso quedan
             // listos fps y cantidad de cuadros desde el primer instante, asi las marcas de la barra
             // y los botones de paso a cuadro no aparecen con retraso.
-            await Task.Run(EnsureFrameStepFileOpen);
+            // EXPERIMENTAL (d3dimage): de paso se lee el espacio de color, que necesita el shader
+            // YUV->RGB. Va despues de abrir el archivo porque recien ahi FFmpeg esta cargado.
+            var path = video.RutaAbsoluta;
+            _videoColor = await Task.Run(() =>
+            {
+                EnsureFrameStepFileOpen();
+                return _frameStepFile is not null ? VideoColorInfo.TryProbe(path) : null;
+            });
             NotifyFrameTickPropertiesChanged();
             NotifyFrameStepAvailabilityChanged();
 
@@ -878,24 +888,25 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             _frameRenderer.StatsUpdated += OnRendererStatsUpdated;
         }
 
-        _frameRenderer.Attach(MediaPlayer, (uint)size.Value.Width, (uint)size.Value.Height);
+        _frameRenderer.Attach(MediaPlayer, (uint)size.Value.Width, (uint)size.Value.Height, _videoColor);
 
         VideoFrame = _frameRenderer.Frame;
         IsCallbackRenderingActive = true;
     }
 
     /// <summary>
-    /// EXPERIMENTAL (rama experimental/d3dimage): por defecto se prueba el render con D3DImage; si
-    /// Direct3D 9Ex no esta disponible se cae al WriteableBitmap de siempre. La variable de entorno
-    /// VSV_RENDERER=bitmap fuerza el WriteableBitmap para comparar los dos con el mismo video.
+    /// EXPERIMENTAL (rama experimental/d3dimage): por defecto se prueba el render con D3DImage y
+    /// conversion YUV->RGB por shader (I420); si no se puede, D3DImage con BGRA, y si Direct3D 9Ex no
+    /// esta disponible, el WriteableBitmap de siempre. Para comparar con el mismo video, la variable
+    /// de entorno VSV_RENDERER fuerza uno: "bitmap" (WriteableBitmap) o "d3d-bgra".
     /// </summary>
     private static IVlcFrameRenderer CreateFrameRenderer()
     {
         var dispatcher = App.Current.Dispatcher;
-        var forceBitmap = string.Equals(Environment.GetEnvironmentVariable("VSV_RENDERER"), "bitmap",
-            StringComparison.OrdinalIgnoreCase);
+        var forced = Environment.GetEnvironmentVariable("VSV_RENDERER")?.Trim().ToLowerInvariant();
 
-        if (!forceBitmap && D3DImageVlcRenderer.TryCreate(dispatcher) is { } d3d)
+        if (forced != "bitmap"
+            && D3DImageVlcRenderer.TryCreate(dispatcher, preferI420: forced != "d3d-bgra") is { } d3d)
             return d3d;
 
         return new VlcFrameRenderer(dispatcher);

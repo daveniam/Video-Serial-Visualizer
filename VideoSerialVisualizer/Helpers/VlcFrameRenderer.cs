@@ -72,7 +72,7 @@ public sealed class VlcFrameRenderer : IVlcFrameRenderer
     /// Conecta el renderer a un MediaPlayer. Debe llamarse con la reproduccion DETENIDA: LibVLC fija
     /// el destino de video al arrancar, asi que cambiarlo con el video andando no tiene efecto.
     /// </summary>
-    public void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height)
+    public void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height, VideoColorInfo? color = null)
     {
         if (_isDisposed || width == 0 || height == 0)
             return;

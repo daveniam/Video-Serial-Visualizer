@@ -28,7 +28,9 @@ public interface IVlcFrameRenderer : IDisposable
 
     /// <summary>Conecta el renderer. Igual que antes: con la reproduccion DETENIDA (LibVLC fija el
     /// destino de video al arrancar) y con el Hwnd ya limpio.</summary>
-    void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height);
+    /// <param name="color">Espacio de color del archivo, si se conoce. Solo lo usa el modo I420 de
+    /// D3DImage (la conversion la hace el shader); en los demas la hace VLC.</param>
+    void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height, VideoColorInfo? color = null);
 
     /// <summary>Desconecta los callbacks para devolverle el dibujo a LibVLC.</summary>
     void Detach(VlcMediaPlayer mediaPlayer);
@@ -37,25 +39,29 @@ public interface IVlcFrameRenderer : IDisposable
 /// <param name="Presented">Cuadros que llegaron a pantalla en el ultimo segundo.</param>
 /// <param name="Dropped">Cuadros que VLC entrego pero se descartaron (la UI todavia no habia
 /// pintado el anterior).</param>
-/// <param name="UiMsPerFrame">Tiempo promedio que el HILO DE UI gasto por cuadro: es la metrica que
-/// esta migracion intenta bajar.</param>
-public readonly record struct RendererStats(string Renderer, int Presented, int Dropped, double UiMsPerFrame)
+/// <param name="UiMsPerFrame">Tiempo promedio que el HILO DE UI gasto por cuadro.</param>
+/// <param name="CpuPercent">CPU de todo el proceso (100% = todos los nucleos). Incluye la
+/// conversion de color que hace VLC por software en BGRA, que es justo lo que el modo I420 evita.</param>
+public readonly record struct RendererStats(string Renderer, int Presented, int Dropped, double UiMsPerFrame, double CpuPercent)
 {
     public override string ToString() =>
-        $"{Renderer} · {Presented} fps · {Dropped} perdidos · UI {UiMsPerFrame:0.00} ms/cuadro";
+        $"{Renderer} · {Presented} fps · {Dropped} perdidos · UI {UiMsPerFrame:0.00} ms/cuadro · CPU {CpuPercent:0.0}%";
 }
 
 /// <summary>Acumulador de <see cref="RendererStats"/> compartido por ambos renderers. Solo se toca
 /// desde el hilo de UI.</summary>
 internal sealed class RendererStatsCounter
 {
-    private readonly string _name;
+    /// <summary>Nombre que aparece en las estadisticas; el renderer lo puede refinar al conectarse.</summary>
+    public string Name { get; set; }
     private readonly System.Diagnostics.Stopwatch _window = System.Diagnostics.Stopwatch.StartNew();
     private int _presented;
     private int _dropped;
     private long _uiTicks;
+    private readonly System.Diagnostics.Process _process = System.Diagnostics.Process.GetCurrentProcess();
+    private TimeSpan _lastCpu = System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime;
 
-    public RendererStatsCounter(string name) => _name = name;
+    public RendererStatsCounter(string name) => Name = name;
 
     public void AddDropped() => Interlocked.Increment(ref _dropped);
 
@@ -69,11 +75,18 @@ internal sealed class RendererStatsCounter
             return null;
 
         var seconds = _window.Elapsed.TotalSeconds;
+
+        _process.Refresh();
+        var cpu = _process.TotalProcessorTime;
+        var cpuPercent = (cpu - _lastCpu).TotalSeconds / seconds / Environment.ProcessorCount * 100;
+        _lastCpu = cpu;
+
         var stats = new RendererStats(
-            _name,
+            Name,
             (int)Math.Round(_presented / seconds),
             (int)Math.Round(Interlocked.Exchange(ref _dropped, 0) / seconds),
-            _presented == 0 ? 0 : _uiTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _presented);
+            _presented == 0 ? 0 : _uiTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _presented,
+            cpuPercent);
 
         _presented = 0;
         _uiTicks = 0;

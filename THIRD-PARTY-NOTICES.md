@@ -74,6 +74,17 @@ Binding administrado sobre FFmpeg. Habilita la decodificación cuadro a cuadro e
 animador. El paquete NuGet **no** contiene binarios de FFmpeg; esos se distribuyen aparte (ver
 "FFmpeg (binarios nativos)" a continuación).
 
+## FFmpeg.AutoGen — Ruslan Balanukhin
+
+- **Versión:** 7.1.1 (`FFmpeg.AutoGen.dll`)
+- **Copyright:** Copyright © Ruslan Balanukhin
+- **Sitio:** https://github.com/Ruslan-B/FFmpeg.AutoGen
+- **Licencia:** LGPL-3.0 (texto en `licenses/LGPL-3.0.txt`; se apoya en la GPL-3.0, en `LICENSE`)
+
+Binding de bajo nivel sobre las bibliotecas de FFmpeg. Llega como dependencia de FFMediaToolkit;
+también se usa directamente para leer el espacio de color del video. Se distribuye como DLL
+separada y sin modificar, reemplazable por el usuario.
+
 ## Markdig — Alexandre Mutel
 
 - **Versión:** 0.22.0

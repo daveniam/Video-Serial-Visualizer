@@ -8,8 +8,9 @@ viaje con cada copia del binario.
 | Archivo | Cubre |
 |---|---|
 | `../LICENSE` | Video Serial Visualizer — GPL-3.0-or-later |
-| `MIT.txt` | .NET Runtime, CommunityToolkit.Mvvm, EF Core, Microsoft.Data.Sqlite, Velopack, FFMediaToolkit, Markdig.Wpf |
+| `MIT.txt` | .NET Runtime, CommunityToolkit.Mvvm, EF Core, Microsoft.Data.Sqlite, Velopack, FFMediaToolkit, Markdig.Wpf, Vortice.Direct3D9 + Vortice.Mathematics, SharpGen.Runtime |
 | `LGPL-2.1.txt` | libVLC, LibVLCSharp, FFmpeg (binarios nativos, build LGPL) |
+| `LGPL-3.0.txt` | FFmpeg.AutoGen (binding administrado de FFmpeg) |
 | `Apache-2.0.txt` | SQLitePCLRaw (`e_sqlite3.dll` y bindings) |
 | `BSD-2-Clause.txt` | Markdig |
 

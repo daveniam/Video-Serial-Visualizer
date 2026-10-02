@@ -49,6 +49,7 @@ jobs:
             "$out/THIRD-PARTY-NOTICES.md",
             "$out/licenses/MIT.txt",
             "$out/licenses/LGPL-2.1.txt",
+            "$out/licenses/LGPL-3.0.txt",
             "$out/licenses/Apache-2.0.txt"
           )
           $faltantes = $requeridos | Where-Object { -not (Test-Path $_) }
