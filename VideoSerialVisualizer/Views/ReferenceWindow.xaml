@@ -130,6 +130,14 @@
                 <Image Source="{Binding FrameStepImage}" Stretch="Uniform"
                        Visibility="{Binding IsFrameStepActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+                <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. -->
+                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Padding="5,2"
+                        Background="#B0000000" CornerRadius="4" IsHitTestVisible="False"
+                        Visibility="{Binding IsFrameStepActive, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding RendererStatsText}" Foreground="#FFFF6B6B" FontSize="10"
+                               FontFamily="Consolas" />
+                </Border>
+
                 <!-- Pista visual de que la esquina se puede arrastrar para redimensionar. El
                      redimensionado real lo resuelve el hook de WM_NCHITTEST (ver el code-behind),
                      que actua antes que WPF; esto es solo para que se descubra. -->

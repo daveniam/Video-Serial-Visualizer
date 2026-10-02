@@ -104,6 +104,17 @@ etiquetas de linea de tiempo.
 Panel de WPF que virtualiza el layout tipo "wrap": solo arma las tarjetas visibles. Se usa en
 Explorar y en la Biblioteca para que abrir grupos con muchos videos sea fluido.
 
+## Vortice.Direct3D9 — Amer Koleci (EXPERIMENTAL, rama experimental/d3dimage)
+
+- **Versión:** 3.8.3, con sus dependencias Vortice.Mathematics 2.1.0, SharpGen.Runtime 2.4.2-beta
+  y SharpGen.Runtime.COM 2.4.2-beta
+- **Copyright:** Copyright (c) Amer Koleci and Contributors; SharpGen: (c) 2010-2017 Alexandre Mutel,
+  2017-2023 Jeremy Koritzinsky, 2023-2024 Amer Koleci
+- **Sitio:** https://github.com/amerkoleci/Vortice.Windows, https://github.com/SharpGenTools/SharpGenTools
+- **Licencia:** MIT (texto y avisos de copyright en `licenses/MIT.txt`)
+
+Interop con Direct3D 9Ex para mostrar el video como textura de GPU compuesta por WPF (`D3DImage`).
+
 ## FFmpeg (binarios nativos) — proyecto FFmpeg
 
 - **Componentes:** `avcodec-61.dll`, `avformat-61.dll`, `avutil-59.dll`, `swscale-8.dll`,

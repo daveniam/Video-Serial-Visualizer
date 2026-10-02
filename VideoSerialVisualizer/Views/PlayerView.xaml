@@ -82,6 +82,14 @@
                    Visibility="{Binding IsFrameStepVisibleInMain, Converter={StaticResource BooleanToVisibilityConverter}}"
                    MouseLeftButtonDown="FrameStepImage_MouseLeftButtonDown" />
 
+            <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. -->
+            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="6,3"
+                    Background="#B0000000" CornerRadius="4" IsHitTestVisible="False"
+                    Visibility="{Binding IsCallbackVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="{Binding RendererStatsText}" Foreground="#FFFF6B6B" FontSize="11"
+                           FontFamily="Consolas" />
+            </Border>
+
             <!-- Con la ventana de referencia abierta el video se dibuja SOLO alla. Sin este cartel,
                  la ventana principal quedaria en negro y pareceria que algo se rompio. -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"

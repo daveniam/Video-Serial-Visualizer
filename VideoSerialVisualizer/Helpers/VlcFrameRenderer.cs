@@ -29,7 +29,7 @@ namespace VideoSerialVisualizer.Helpers;
 /// hardware, asi que se usa solo donde hace falta (la ventana de referencia flotante), no en la
 /// reproduccion normal.
 /// </summary>
-public sealed class VlcFrameRenderer : IDisposable
+public sealed class VlcFrameRenderer : IVlcFrameRenderer
 {
     private readonly Dispatcher _dispatcher;
 
@@ -51,8 +51,16 @@ public sealed class VlcFrameRenderer : IDisposable
 
     private bool _isDisposed;
 
+    private readonly RendererStatsCounter _stats = new("WriteableBitmap");
+
     /// <summary>Imagen donde se pinta el video. Se crea al configurar el tamano.</summary>
     public WriteableBitmap? Frame { get; private set; }
+
+    ImageSource? IVlcFrameRenderer.Frame => Frame;
+
+    public string Name => "WriteableBitmap";
+
+    public event Action<RendererStats>? StatsUpdated;
 
     /// <summary>Se dispara (en el hilo de UI) la primera vez que hay un cuadro pintado, para que la
     /// vista pueda enlazar la imagen recien entonces.</summary>
@@ -96,7 +104,10 @@ public sealed class VlcFrameRenderer : IDisposable
                 return;
 
             if (Interlocked.CompareExchange(ref _pendingPaint, 1, 0) != 0)
+            {
+                _stats.AddDropped();
                 return;
+            }
 
             _dispatcher.BeginInvoke(() =>
             {
@@ -104,8 +115,11 @@ public sealed class VlcFrameRenderer : IDisposable
                 {
                     if (!_isDisposed && Frame is not null && _buffer != IntPtr.Zero)
                     {
+                        var start = System.Diagnostics.Stopwatch.GetTimestamp();
                         Frame.WritePixels(_frameRect, _buffer, _bufferSize, _pitch);
                         FrameReady?.Invoke();
+                        if (_stats.AddPresented(System.Diagnostics.Stopwatch.GetTimestamp() - start) is { } stats)
+                            StatsUpdated?.Invoke(stats);
                     }
                 }
                 catch

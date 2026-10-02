@@ -110,7 +110,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private int _frameStepGeneration;
 
     /// <summary>Render del video como imagen WPF (modo animador). Null cuando dibuja LibVLC.</summary>
-    private VlcFrameRenderer? _frameRenderer;
+    private IVlcFrameRenderer? _frameRenderer;
 
     private int _videoPixelWidth;
     private int _videoPixelHeight;
@@ -353,7 +353,12 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     /// ventana nativa de LibVLC. Ver <see cref="VlcFrameRenderer"/> para el por que.
     /// </summary>
     [ObservableProperty]
-    private WriteableBitmap? videoFrame;
+    private System.Windows.Media.ImageSource? videoFrame;
+
+    /// <summary>EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones
+    /// (fps, cuadros perdidos, costo en el hilo de UI). Se muestra sobre el video.</summary>
+    [ObservableProperty]
+    private string? rendererStatsText;
 
     /// <summary>El video se esta dibujando por callbacks (imagen WPF) y no en la ventana nativa.</summary>
     [ObservableProperty]
@@ -867,24 +872,50 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         // ventana suelta y la imagen WPF nunca se actualiza). Por eso el Hwnd se limpia primero.
         MediaPlayer.Hwnd = IntPtr.Zero;
 
-        _frameRenderer ??= new VlcFrameRenderer(App.Current.Dispatcher);
+        if (_frameRenderer is null)
+        {
+            _frameRenderer = CreateFrameRenderer();
+            _frameRenderer.StatsUpdated += OnRendererStatsUpdated;
+        }
+
         _frameRenderer.Attach(MediaPlayer, (uint)size.Value.Width, (uint)size.Value.Height);
 
         VideoFrame = _frameRenderer.Frame;
         IsCallbackRenderingActive = true;
     }
 
+    /// <summary>
+    /// EXPERIMENTAL (rama experimental/d3dimage): por defecto se prueba el render con D3DImage; si
+    /// Direct3D 9Ex no esta disponible se cae al WriteableBitmap de siempre. La variable de entorno
+    /// VSV_RENDERER=bitmap fuerza el WriteableBitmap para comparar los dos con el mismo video.
+    /// </summary>
+    private static IVlcFrameRenderer CreateFrameRenderer()
+    {
+        var dispatcher = App.Current.Dispatcher;
+        var forceBitmap = string.Equals(Environment.GetEnvironmentVariable("VSV_RENDERER"), "bitmap",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!forceBitmap && D3DImageVlcRenderer.TryCreate(dispatcher) is { } d3d)
+            return d3d;
+
+        return new VlcFrameRenderer(dispatcher);
+    }
+
+    private void OnRendererStatsUpdated(RendererStats stats) => RendererStatsText = stats.ToString();
+
     /// <summary>Devuelve el dibujo del video a la ventana nativa de LibVLC (camino rapido normal).</summary>
     private void DetachFrameRenderer()
     {
         if (_frameRenderer is not null)
         {
+            _frameRenderer.StatsUpdated -= OnRendererStatsUpdated;
             _frameRenderer.Detach(MediaPlayer);
             _frameRenderer.Dispose();
             _frameRenderer = null;
         }
 
         VideoFrame = null;
+        RendererStatsText = null;
         IsCallbackRenderingActive = false;
 
         // Reafirmar el Hwnd justo antes de reproducir: si LibVLC no tiene una ventana de destino
