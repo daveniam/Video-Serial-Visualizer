@@ -33,8 +33,14 @@ public partial class PlayerView : UserControl
     private HwndSource? _hostSource;
     private bool _inSizeMove;
 
+    // Se guarda al cargar: cuando WPF dispara Unloaded la vista ya esta desconectada del arbol y su
+    // DataContext heredado es null (o el del siguiente view), asi que ahi no se puede confiar en el.
+    private PlayerViewModel? _vm;
+
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _vm = DataContext as PlayerViewModel;
+
         // Acceder a Handle fuerza la creacion de la ventana nativa; se la pasamos al MediaPlayer
         // ANTES de reproducir (MainViewModel espera a este Loaded), asi LibVLC pinta aca dentro.
         if (DataContext is PlayerViewModel vm)
@@ -83,6 +89,20 @@ public partial class PlayerView : UserControl
     private WindowState _prevWindowState;
 
     private void ToggleFullScreen_Click(object sender, RoutedEventArgs e) => ToggleFullScreen();
+
+    // Muestran/ocultan la barra de controles en pantalla completa (ver ShowControlsBar en el
+    // ViewModel). Sin efecto en ventana normal, donde la barra siempre esta visible.
+    private void ControlsBar_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (DataContext is PlayerViewModel vm)
+            vm.IsControlsBarHovered = true;
+    }
+
+    private void ControlsBar_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (DataContext is PlayerViewModel vm)
+            vm.IsControlsBarHovered = false;
+    }
 
     private void ToggleFullScreen()
     {
@@ -141,22 +161,36 @@ public partial class PlayerView : UserControl
     private void OnMediaPlayerPlaying(object? sender, EventArgs e)
         => Dispatcher.BeginInvoke(() => Keyboard.Focus(this));
 
+    // Volver atras estando en pantalla completa: la ventana se restaura YA, en el clic. El comando
+    // Back es asincrono (guarda posicion, detiene el video) y recien al terminar cambia de vista;
+    // si la restauracion esperara a Unloaded, la ventana seguiria a pantalla completa todo ese rato.
+    // Click se dispara antes que el Command del boton, asi que corre primero.
+    private void BackButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm is { IsFullScreen: true })
+            ToggleFullScreen();
+    }
+
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
-        if (DataContext is PlayerViewModel vm)
+        var vm = _vm;
+        _vm = null;
+
+        if (vm is not null)
         {
             vm.DetachVideoSurface();
             vm.MediaPlayer.Playing -= OnMediaPlayerPlaying;
         }
 
-        // Al salir del reproductor estando en pantalla completa, se restaura la ventana para no dejar
-        // la biblioteca/explorar en modo borderless.
-        if (_hostWindow is not null && DataContext is PlayerViewModel v && v.IsFullScreen)
+        // Red de seguridad para cualquier otra forma de salir del reproductor en pantalla completa
+        // (error de reproduccion, siguiente video sin mas items...): se restaura la ventana para no
+        // dejar la biblioteca/explorar en modo borderless.
+        if (_hostWindow is not null && vm is { IsFullScreen: true })
         {
             _hostWindow.WindowStyle = _prevWindowStyle;
             _hostWindow.ResizeMode = _prevResizeMode;
             _hostWindow.WindowState = _prevWindowState;
-            v.IsFullScreen = false;
+            vm.IsFullScreen = false;
         }
 
         if (_hostWindow is not null)
@@ -175,8 +209,8 @@ public partial class PlayerView : UserControl
         // Por las dudas: no dejar la superficie suspendida si se sale del reproductor a mitad de un
         // redimensionado.
         _inSizeMove = false;
-        if (DataContext is PlayerViewModel rv)
-            rv.IsResizingWindow = false;
+        if (vm is not null)
+            vm.IsResizingWindow = false;
     }
 
     private void OnHostWindowActivated(object? sender, EventArgs e)

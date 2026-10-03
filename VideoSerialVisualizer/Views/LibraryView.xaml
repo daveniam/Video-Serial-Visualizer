@@ -19,13 +19,27 @@
 
         <!-- Encabezado -->
         <Grid Grid.Row="0" Margin="0,0,0,24">
-            <StackPanel Orientation="Horizontal">
-                <Button Style="{StaticResource BackButtonStyle}" Command="{Binding BackCommand}" Margin="0,0,14,0"
-                        VerticalAlignment="Center" ToolTip="{loc:Tr Library_BackToExplore}" />
-                <TextBlock Text="{Binding ScopeTitle}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
-                           VerticalAlignment="Center" />
-                <Button Style="{StaticResource OpenFolderButtonStyle}" Command="{Binding OpenContainingFolderCommand}" Margin="14,0,0,0"
-                        VerticalAlignment="Center" ToolTip="{loc:Tr Library_OpenFolder}" />
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource BackButtonStyle}" Command="{Binding BackCommand}" Margin="0,0,14,0"
+                            VerticalAlignment="Center" ToolTip="{loc:Tr Library_BackToExplore}" />
+                    <TextBlock Text="{Binding ScopeTitle}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                               VerticalAlignment="Center" />
+                    <Button Style="{StaticResource OpenFolderButtonStyle}" Command="{Binding OpenContainingFolderCommand}" Margin="14,0,0,0"
+                            VerticalAlignment="Center" ToolTip="{loc:Tr Library_OpenFolder}" />
+                </StackPanel>
+
+                <!-- Cuanto de ESTE grupo ya se vio, mismo estilo que la linea de las tarjetas de Explorar. -->
+                <StackPanel Orientation="Horizontal" Margin="54,10,0,0"
+                            Visibility="{Binding HasVideos, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid Width="200" Height="4" Background="{StaticResource BgSurfaceAltBrush}" VerticalAlignment="Center">
+                        <Rectangle Height="4" HorizontalAlignment="Left"
+                                   Fill="{Binding AllWatched, Converter={StaticResource CompletadoToBrushConverter}}"
+                                   Width="{Binding WatchedPercent, Converter={StaticResource PercentToWidthConverter}, ConverterParameter=200}" />
+                    </Grid>
+                    <TextBlock Text="{Binding WatchedSummaryText}" Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
             </StackPanel>
         </Grid>
 

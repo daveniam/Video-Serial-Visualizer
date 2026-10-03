@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using VideoSerialVisualizer.Data;
 using VideoSerialVisualizer.Helpers;
+using VideoSerialVisualizer.Localization;
 using VideoSerialVisualizer.Models;
 using VideoSerialVisualizer.Services;
 
@@ -37,6 +38,36 @@ public partial class LibraryViewModel : ObservableObject
     /// <summary>Muestra la ruedita de carga mientras se arma el grupo.</summary>
     [ObservableProperty]
     private bool isLoading;
+
+    // --- Resumen de "visto" del grupo (linea bajo el titulo, igual estilo que las tarjetas de
+    // Explorar): cuantos de los videos de ESTE grupo ya estan marcados como vistos. Se recalcula al
+    // cargar el grupo y despues de marcar/desmarcar un video individual.
+
+    [ObservableProperty]
+    private int watchedCount;
+
+    [ObservableProperty]
+    private int totalVideoCount;
+
+    [ObservableProperty]
+    private double watchedPercent;
+
+    [ObservableProperty]
+    private bool allWatched;
+
+    public bool HasVideos => TotalVideoCount > 0;
+
+    public string WatchedSummaryText => string.Format(Loc.I["Explore_WatchedProgress"], WatchedCount, TotalVideoCount);
+
+    private void RecomputeWatchedSummary()
+    {
+        TotalVideoCount = _allVideos.Count;
+        WatchedCount = _allVideos.Count(v => v.Completado);
+        WatchedPercent = TotalVideoCount > 0 ? WatchedCount / (double)TotalVideoCount * 100.0 : 0;
+        AllWatched = TotalVideoCount > 0 && WatchedCount == TotalVideoCount;
+        OnPropertyChanged(nameof(HasVideos));
+        OnPropertyChanged(nameof(WatchedSummaryText));
+    }
 
     public LibraryViewModel(Action<Video> openVideo, Action goBack)
     {
@@ -68,6 +99,7 @@ public partial class LibraryViewModel : ObservableObject
 
         var progress = await _progressTracker.ToggleWatchedAsync(card.Id, card.Video.DuracionMs);
         card.ApplyProgress(progress);
+        RecomputeWatchedSummary();
     }
 
     /// <summary>
@@ -168,6 +200,7 @@ public partial class LibraryViewModel : ObservableObject
             .ToList();
 
         ApplyFilter();
+        RecomputeWatchedSummary();
 
         foreach (var video in _allVideos)
             _ = video.LoadThumbnailAsync();

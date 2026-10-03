@@ -400,6 +400,20 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool isFullScreen;
 
+    /// <summary>Mouse sobre la zona de la barra de controles (linea de tiempo + botones). Lo setea la
+    /// vista por MouseEnter/MouseLeave sobre esa zona (ver PlayerView.xaml.cs).</summary>
+    [ObservableProperty]
+    private bool isControlsBarHovered;
+
+    /// <summary>Si la barra de controles debe mostrarse: siempre en ventana normal; en pantalla
+    /// completa, solo mientras el mouse esta sobre esa zona (igual que YouTube/VLC), para que el
+    /// video aproveche toda la pantalla el resto del tiempo.</summary>
+    public bool ShowControlsBar => !IsFullScreen || IsControlsBarHovered;
+
+    partial void OnIsFullScreenChanged(bool value) => OnPropertyChanged(nameof(ShowControlsBar));
+
+    partial void OnIsControlsBarHoveredChanged(bool value) => OnPropertyChanged(nameof(ShowControlsBar));
+
     /// <summary>La ventana se esta redimensionando ahora mismo (la vista lo detecta por los mensajes
     /// del ciclo de arrastre). Mientras dura, se suspende la superficie nativa del video para que el
     /// redimensionado sea fluido (ver <see cref="ShowNativeVideoSurface"/>).</summary>

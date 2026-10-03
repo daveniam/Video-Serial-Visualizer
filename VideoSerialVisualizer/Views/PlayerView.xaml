@@ -59,6 +59,7 @@
              tiene su propia fila y los controles van en filas separadas, sin superposicion.
         -->
         <Button Grid.Row="0" Style="{StaticResource BackButtonStyle}" HorizontalAlignment="Left" Margin="16"
+                Click="BackButton_Click"
                 Command="{Binding BackCommand}" ToolTip="{loc:Tr Player_BackToLibrary}" />
 
         <!-- El video se aloja en una ventana nativa hija (MediaPlayer.Hwnd) via WindowsFormsHost.
@@ -142,7 +143,23 @@
             </Popup>
         </Grid>
 
-        <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" Padding="16,10,16,10">
+        <!-- En pantalla completa esta barra se oculta sola y solo reaparece con el mouse encima
+             (MouseEnter/MouseLeave en code-behind setean IsControlsBarHovered); en ventana normal
+             queda siempre visible. Se oculta con Opacity (no Visibility) a proposito: asi la fila
+             sigue reservando su alto (el video no se redimensiona cada vez que aparece/desaparece la
+             barra) y solo se desvanece sobre el fondo oscuro. -->
+        <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" Padding="16,10,16,10"
+                MouseEnter="ControlsBar_MouseEnter" MouseLeave="ControlsBar_MouseLeave">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Opacity" Value="1" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowControlsBar}" Value="False">
+                            <Setter Property="Opacity" Value="0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <StackPanel>
                 <!-- Aviso breve tras fijar la portada del grupo (clic derecho en la barra). Va aca, en
                      la barra de controles (contenido WPF normal), y no sobre el video: ahi la ventana
@@ -461,6 +478,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
@@ -557,9 +575,27 @@
                         <TextBlock Text="{Binding TotalTimeText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
                     </StackPanel>
 
+                    <!-- Pantalla completa (tambien con F; Esc sale). Antes solo estaba en la barra del
+                         modo animador, asi que en reproduccion normal no habia boton visible para esto,
+                         solo el atajo de teclado. El icono cambia entre "expandir" y "contraer" segun
+                         el estado; la logica vive en el code-behind porque toca la ventana. -->
+                    <Button Grid.Column="9" Style="{StaticResource PlayerIconButtonStyle}" Width="30" Height="30" Margin="6,0,0,0"
+                            Click="ToggleFullScreen_Click" ToolTip="{loc:Tr Player_FullScreen}">
+                        <Viewbox Width="16" Height="16">
+                            <Grid Width="24" Height="24">
+                                <Path Data="M3,9 L3,3 L9,3 M15,3 L21,3 L21,9 M21,15 L21,21 L15,21 M9,21 L3,21 L3,15"
+                                      Stroke="{StaticResource TextPrimaryBrush}" StrokeThickness="2"
+                                      Visibility="{Binding IsFullScreen, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+                                <Path Data="M9,3 L9,9 L3,9 M15,3 L15,9 L21,9 M21,15 L15,15 L15,21 M3,15 L9,15 L9,21"
+                                      Stroke="{StaticResource TextPrimaryBrush}" StrokeThickness="2"
+                                      Visibility="{Binding IsFullScreen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </Grid>
+                        </Viewbox>
+                    </Button>
+
                     <!-- Aparece en los ultimos 30s: el relleno avanza hasta que el video termina
                          y encadena solo con el siguiente. Clic = pasar al siguiente ya mismo. -->
-                    <Button Grid.Column="9" HorizontalAlignment="Right" VerticalAlignment="Center" Focusable="False"
+                    <Button Grid.Column="10" HorizontalAlignment="Right" VerticalAlignment="Center" Focusable="False"
                             Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayNextCommand}"
                             ToolTip="{loc:Tr Player_NextVideo}"
                             Visibility="{Binding IsNextFillVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
