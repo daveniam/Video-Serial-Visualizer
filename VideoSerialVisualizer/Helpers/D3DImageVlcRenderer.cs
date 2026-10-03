@@ -87,12 +87,18 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     private IDirect3DQuery9? _flushQuery;
     private IDirect3DPixelShader9? _yuvShader;
 
-    // Destino doble buffer (lo que se le da a D3DImage), al tamano de visualizacion.
-    private readonly IDirect3DTexture9?[] _targets = new IDirect3DTexture9?[2];
-    private readonly IDirect3DSurface9?[] _targetSurfaces = new IDirect3DSurface9?[2];
-
-    /// <summary>Indice del destino que se dibuja a continuacion; el otro es el que muestra WPF.</summary>
-    private int _backIndex;
+    // Dos texturas al tamano de visualizacion:
+    //  * _rendered (privada): donde dibuja el hilo de VLC cada cuadro.
+    //  * _shared: el back buffer FIJO de D3DImage. Solo se escribe en el hilo de UI, entre
+    //    D3DImage.Lock y Unlock, copiando _rendered (GPU a GPU). Es el patron documentado de
+    //    D3DImage: mientras esta bloqueado, WPF garantiza que no lo lee.
+    // Antes se alternaban dos back buffers con SetBackBuffer en CADA cuadro: SetBackBuffer esta
+    // pensado para cuando cambia el buffer, y cambiarlo 60 veces por segundo hacia parpadear la
+    // imagen. Ahora SetBackBuffer se llama solo cuando cambia el tamano.
+    private IDirect3DTexture9? _renderedTexture;
+    private IDirect3DSurface9? _renderedSurface;
+    private IDirect3DTexture9? _sharedTexture;
+    private IDirect3DSurface9? _sharedSurface;
 
     // Modo I420: un plano por textura (Y a tamano completo, U y V a la mitad en cada eje).
     private readonly IDirect3DTexture9?[] _planeTextures = new IDirect3DTexture9?[3];
@@ -148,14 +154,23 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
     private bool _isDisposed;
 
+    // Diagnostico (DiagLog): solo se registran los primeros cuadros de cada video.
+    private int _diagFrames;
+    private int _diagPresented;
+
     public string Name { get; private set; }
 
     public ImageSource? Frame => _image;
 
     public event Action<RendererStats>? StatsUpdated;
 
-    /// <summary>El D3DImage es siempre el mismo (solo cambia la superficie que muestra): nunca se dispara.</summary>
-    public event Action? FrameChanged { add { } remove { } }
+    /// <summary>
+    /// El D3DImage es siempre el mismo objeto, pero se avisa igual cuando cambia de tamano: un Image
+    /// de WPF cuya Source viene de un Binding NO se vuelve a medir cuando el D3DImage cambia de
+    /// tamano (si la Source se asigna directo, si). Sin re-enlazar, el primer video quedaba en un
+    /// Image de 0x0: se escuchaba pero no se veia. Verificado en el arnes con el mismo video.
+    /// </summary>
+    public event Action? FrameChanged;
 
     /// <summary>Se dispara (en el hilo de UI) cuando cambia el tamano de visualizacion del video.</summary>
     public event Action<int, int>? VideoSizeChanged;
@@ -173,6 +188,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         {
             _image = new D3DImage();
             _image.IsFrontBufferAvailableChanged += OnFrontBufferAvailableChanged;
+            DiagLog.Write($"D3D: D3DImage creado, IsFrontBufferAvailable={_image.IsFrontBufferAvailable}");
         });
     }
 
@@ -286,6 +302,9 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// corregir despues con <see cref="UpdateColorInfo"/>.</param>
     public void Attach(VlcMediaPlayer mediaPlayer, Media? media, VideoColorInfo? color)
     {
+        DiagLog.Write($"D3D: Attach media={(media is null ? "null" : System.IO.Path.GetFileName(media.Mrl))} color={color?.ToString() ?? "null"} disposed={_isDisposed} device={_device is not null}");
+        _diagFrames = 0;
+        _diagPresented = 0;
         if (_isDisposed || _device is null)
             return;
 
@@ -340,6 +359,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         try
         {
             var (visibleWidth, visibleHeight, sar) = VlcVideoGeometry.Resolve(_media, (int)width, (int)height);
+            DiagLog.Write($"D3D: formato ofrecido {Marshal.PtrToStringAnsi(chroma, 4)} {width}x{height} -> visible {visibleWidth}x{visibleHeight} sar {sar:0.###}");
             bool recreated;
 
             lock (_sync)
@@ -369,7 +389,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
                 recreated = bufferWidth != _bufferWidth || bufferHeight != _bufferHeight
                     || visibleWidth != _visibleWidth || visibleHeight != _visibleHeight
-                    || _targets[0] is null || TargetSizeChanged();
+                    || _sharedSurface is null || TargetSizeChanged();
 
                 if (recreated)
                 {
@@ -398,6 +418,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
                 Interlocked.Exchange(ref _pendingPaint, 0);
             }
 
+            DiagLog.Write($"D3D: formato aceptado buffer {_bufferWidth}x{_bufferHeight} destino {_targetWidth}x{_targetHeight} recreado={recreated}");
             if (recreated)
                 _dispatcher.BeginInvoke(OnResourcesRecreated);
 
@@ -406,13 +427,14 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         catch (Exception ex)
         {
             Debug.WriteLine($"[D3DImage] Fallo al configurar el formato: {ex}");
+            DiagLog.Write($"D3D: EXCEPCION en formato: {ex}");
             return 0;
         }
     }
 
     private bool TargetSizeChanged()
     {
-        var surface = _targetSurfaces[0];
+        var surface = _sharedSurface;
         if (surface is null)
             return true;
 
@@ -423,18 +445,22 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// <summary>Con <see cref="_sync"/> tomado. Crea destinos, buffers y texturas al tamano actual.</summary>
     private void CreateFrameResources()
     {
-        for (var i = 0; i < 2; i++)
-        {
-            // El handle compartido es lo que permite a WPF (que tiene su PROPIO dispositivo D3D)
-            // abrir la textura directo, sin copiarla otra vez.
-            var shared = IntPtr.Zero;
-            _targets[i] = _device!.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
-                TargetFormat, Pool.Default, ref shared);
-            _targetSurfaces[i] = _targets[i]!.GetSurfaceLevel(0);
+        // El handle compartido es lo que permite a WPF (que tiene su PROPIO dispositivo D3D) abrir
+        // el back buffer directo. La textura privada no lo necesita.
+        var shared = IntPtr.Zero;
+        _sharedTexture = _device!.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
+            TargetFormat, Pool.Default, ref shared);
+        _sharedSurface = _sharedTexture.GetSurfaceLevel(0);
 
-            // La memoria de una textura nueva no viene inicializada: sin esto, el destino que se
-            // muestra hasta el primer cuadro podria verse con basura en vez de negro.
-            _device.SetRenderTarget(0, _targetSurfaces[i]!);
+        _renderedTexture = _device.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
+            TargetFormat, Pool.Default);
+        _renderedSurface = _renderedTexture.GetSurfaceLevel(0);
+
+        // La memoria de una textura nueva no viene inicializada: sin esto, hasta el primer cuadro
+        // podria verse basura en vez de negro.
+        foreach (var surface in new[] { _sharedSurface, _renderedSurface })
+        {
+            _device.SetRenderTarget(0, surface);
             _device.Clear(ClearFlags.Target, new Vortice.Mathematics.Color(0, 0, 0, 255), 1f, 0);
         }
 
@@ -476,8 +502,6 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             _staging = _device.CreateOffscreenPlainSurface((uint)_bufferWidth, (uint)_bufferHeight, TargetFormat,
                 Pool.SystemMemory);
         }
-
-        _backIndex = 0;
     }
 
     /// <summary>
@@ -486,15 +510,16 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// </summary>
     private void RetireFrameResources()
     {
-        for (var i = 0; i < 2; i++)
+        foreach (var resource in new IDisposable?[] { _sharedSurface, _sharedTexture, _renderedSurface, _renderedTexture })
         {
-            if (_targetSurfaces[i] is { } surface)
-                _retired.Add(surface);
-            if (_targets[i] is { } target)
-                _retired.Add(target);
-            _targetSurfaces[i] = null;
-            _targets[i] = null;
+            if (resource is not null)
+                _retired.Add(resource);
         }
+
+        _sharedSurface = null;
+        _sharedTexture = null;
+        _renderedSurface = null;
+        _renderedTexture = null;
 
         for (var i = 0; i < 3; i++)
         {
@@ -535,20 +560,30 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             if (_isDisposed)
                 return;
 
-            SetBackBuffer(1 - _backIndex);
+            DiagLog.Write($"D3D: OnResourcesRecreated FrontBuffer={_image?.IsFrontBufferAvailable} D3DImage antes {_image?.PixelWidth}x{_image?.PixelHeight}");
+
+            SetBackBuffer();
             FreeRetired();
             width = _targetWidth;
             height = _targetHeight;
         }
 
+        FrameChanged?.Invoke();
         VideoSizeChanged?.Invoke(width, height);
     }
 
-    /// <summary>Hilo de VLC: dibuja el cuadro en el destino de atras y le pide a la UI que lo muestre.</summary>
+    /// <summary>
+    /// Hilo de VLC: dibuja el cuadro en la textura privada y le pide a la UI que lo pase al back
+    /// buffer de D3DImage. Mientras haya una presentacion pendiente no se dibuja (se descarta el
+    /// cuadro): asi la textura privada nunca se pisa antes de que la UI la copie.
+    /// </summary>
     private void OnFrameDecoded()
     {
         if (_isDisposed)
             return;
+
+        if (Interlocked.Increment(ref _diagFrames) <= 3)
+            DiagLog.Write($"D3D: cuadro decodificado #{_diagFrames} pending={_pendingPaint} buffer={_buffer != IntPtr.Zero} destino={_renderedSurface is not null}");
 
         if (Interlocked.CompareExchange(ref _pendingPaint, 1, 0) != 0)
         {
@@ -556,34 +591,30 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             return;
         }
 
-        int filled;
         lock (_sync)
         {
-            if (_isDisposed || _device is null || _buffer == IntPtr.Zero || _targetSurfaces[_backIndex] is null)
+            if (_isDisposed || _device is null || _buffer == IntPtr.Zero || _renderedSurface is null)
             {
                 Interlocked.Exchange(ref _pendingPaint, 0);
                 return;
             }
 
-            filled = _backIndex;
             try
             {
                 if (_mode == PixelMode.I420)
-                    DrawI420(_targetSurfaces[filled]!);
+                    DrawI420(_renderedSurface);
                 else
-                    CopyBgra(_targetSurfaces[filled]!);
+                    CopyBgra(_renderedSurface);
 
-                // WPF lee la textura desde OTRO dispositivo D3D: hay que garantizar que la GPU
-                // termino de escribirla antes de entregarla, o se verian cuadros a medio dibujar.
-                _flushQuery!.Issue(Issue.End);
-                var done = false;
-                while (!_flushQuery.GetData(out done, true) || !done)
-                    Thread.SpinWait(50);
+                // Se espera aca (hilo de VLC) a que la GPU termine de dibujar, asi en el hilo de UI
+                // solo queda por esperar la copia al back buffer, que es mucho mas corta.
+                WaitForGpu();
             }
             catch (Exception ex)
             {
                 // Un cuadro fallido no debe tumbar la reproduccion: se saltea.
                 Debug.WriteLine($"[D3DImage] Cuadro descartado: {ex.Message}");
+                DiagLog.Write($"D3D: EXCEPCION al dibujar: {ex}");
                 Interlocked.Exchange(ref _pendingPaint, 0);
                 return;
             }
@@ -599,11 +630,28 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
                 var start = Stopwatch.GetTimestamp();
                 lock (_sync)
                 {
-                    if (_targetSurfaces[filled] is null)
+                    if (_device is null || _renderedSurface is null || _sharedSurface is null
+                        || !_image.IsFrontBufferAvailable)
                         return;
 
-                    SetBackBuffer(filled);
-                    _backIndex = 1 - filled;
+                    // Lock: WPF no lee el back buffer hasta el Unlock. Se copia el cuadro (GPU a
+                    // GPU) y se espera a que termine: WPF lo lee desde OTRO dispositivo D3D, y sin
+                    // esperar podria tomar un cuadro a medio copiar.
+                    _image.Lock();
+                    try
+                    {
+                        var rect = new D3DRect(0, 0, _targetWidth, _targetHeight);
+                        _device.StretchRect(_renderedSurface, rect, _sharedSurface, rect, TextureFilter.None);
+                        WaitForGpu();
+                        _image.AddDirtyRect(new Int32Rect(0, 0, _image.PixelWidth, _image.PixelHeight));
+                    }
+                    finally
+                    {
+                        _image.Unlock();
+                    }
+
+                    if (++_diagPresented <= 3)
+                        DiagLog.Write($"D3D: presentado #{_diagPresented} FrontBuffer={_image.IsFrontBufferAvailable} D3DImage {_image.PixelWidth}x{_image.PixelHeight}");
                 }
 
                 if (_stats.AddPresented(Stopwatch.GetTimestamp() - start) is { } stats)
@@ -612,6 +660,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             catch (Exception ex)
             {
                 Debug.WriteLine($"[D3DImage] Error al presentar: {ex.Message}");
+                DiagLog.Write($"D3D: EXCEPCION al presentar: {ex}");
             }
             finally
             {
@@ -710,12 +759,18 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             Buffer.MemoryCopy(src + (long)y * srcPitch, dst + (long)y * dstPitch, rowBytes, rowBytes);
     }
 
-    /// <summary>Hilo de UI. Muestra el destino indicado.</summary>
-    private void SetBackBuffer(int index)
+    /// <summary>
+    /// Hilo de UI. Le da a D3DImage el back buffer fijo. Solo al crearlo (cambio de tamano) o al
+    /// recuperar el front buffer, nunca por cuadro (ver los campos _rendered/_shared).
+    /// </summary>
+    private void SetBackBuffer()
     {
-        var surface = _targetSurfaces[index];
+        var surface = _sharedSurface;
         if (_image is null || surface is null || !_image.IsFrontBufferAvailable)
+        {
+            DiagLog.Write($"D3D: SetBackBuffer OMITIDO image={_image is not null} surface={surface is not null} FrontBuffer={_image?.IsFrontBufferAvailable}");
             return;
+        }
 
         _image.Lock();
         try
@@ -737,11 +792,21 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// </summary>
     private void OnFrontBufferAvailableChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
+        DiagLog.Write($"D3D: IsFrontBufferAvailable cambio a {_image?.IsFrontBufferAvailable}");
         if (_image is null || !_image.IsFrontBufferAvailable)
             return;
 
         lock (_sync)
-            SetBackBuffer(1 - _backIndex);
+            SetBackBuffer();
+    }
+
+    /// <summary>Espera a que la GPU termine todo lo encolado en el dispositivo hasta ahora.</summary>
+    private void WaitForGpu()
+    {
+        _flushQuery!.Issue(Issue.End);
+        var done = false;
+        while (!_flushQuery.GetData(out done, true) || !done)
+            Thread.SpinWait(50);
     }
 
     public void Detach(VlcMediaPlayer mediaPlayer)
@@ -778,6 +843,8 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     {
         if (_isDisposed)
             return;
+
+        DiagLog.Write("D3D: Dispose");
 
         _isDisposed = true;
 

@@ -25,7 +25,8 @@ public interface IVlcFrameRenderer : IDisposable
     /// del video (ver <see cref="FrameChanged"/>).</summary>
     ImageSource? Frame { get; }
 
-    /// <summary>Se dispara en el hilo de UI cuando <see cref="Frame"/> pasa a ser otra instancia.</summary>
+    /// <summary>Se dispara en el hilo de UI cuando <see cref="Frame"/> pasa a ser otra instancia o
+    /// cambia de tamano: quien la muestra debe volver a enlazarla (ver D3DImageVlcRenderer).</summary>
     event Action? FrameChanged;
 
     /// <summary>Se dispara en el hilo de UI aprox. una vez por segundo con las mediciones.</summary>

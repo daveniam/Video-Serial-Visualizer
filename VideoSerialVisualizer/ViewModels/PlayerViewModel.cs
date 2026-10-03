@@ -832,6 +832,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private void ConfigureVideoOutput(string path)
     {
         var renderer = EnsureFrameRenderer();
+        DiagLog.Write($"VM: ConfigureVideoOutput {System.IO.Path.GetFileName(path)} renderer={renderer.Name} animador={IsAnimatorModeEnabled} color={_videoColor?.ToString() ?? "null"}");
 
         // En LibVLC "dibujar en una ventana" y "entregar los cuadros por callbacks" son excluyentes y
         // gana lo ultimo que se configura; sin Hwnd y sin callbacks, VLC abre su PROPIA ventana
@@ -840,6 +841,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         MediaPlayer.Hwnd = IntPtr.Zero;
         renderer.Attach(MediaPlayer, _media, _videoColor);
         VideoFrame = renderer.Frame;
+        DiagLog.Write($"VM: VideoFrame={(VideoFrame is null ? "null" : VideoFrame.GetType().Name)} IsLiveVideoVisible={IsLiveVideoVisible} FrameStep={IsFrameStepActive} Referencia={IsReferenceWindowOpen}");
 
         // Fuera del modo animador no se abrio el archivo con FFmpeg: el video arranca con la matriz
         // de color por convencion y se corrige al terminar el sondeo (unos ms despues). Solo importa
@@ -868,15 +870,30 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
                 : null)
             ?? (IVlcFrameRenderer)new VlcFrameRenderer(dispatcher);
 
+        DiagLog.Write($"VM: renderer creado: {_frameRenderer.Name} (VSV_RENDERER={forced ?? "-"})");
         _frameRenderer.StatsUpdated += OnRendererStatsUpdated;
         _frameRenderer.FrameChanged += OnRendererFrameChanged;
         return _frameRenderer;
     }
 
-    private void OnRendererStatsUpdated(RendererStats stats) => RendererStatsText = stats.ToString();
+    private void OnRendererStatsUpdated(RendererStats stats)
+    {
+        RendererStatsText = stats.ToString();
+        if (++_diagStats <= 5)
+            DiagLog.Write($"VM: stats {RendererStatsText}");
+    }
 
-    // El WriteableBitmap se recrea cuando cambia el tamano del video: hay que reenlazarlo.
-    private void OnRendererFrameChanged() => VideoFrame = _frameRenderer?.Frame;
+    // La imagen cambio de instancia (WriteableBitmap) o de tamano (D3DImage): se re-enlaza pasando
+    // por null, porque un Image con Source por Binding no se vuelve a medir solo cuando el D3DImage
+    // cambia de tamano, y asignar el mismo objeto no notificaria nada.
+    private void OnRendererFrameChanged()
+    {
+        VideoFrame = null;
+        VideoFrame = _frameRenderer?.Frame;
+        DiagLog.Write($"VM: imagen re-enlazada ({VideoFrame?.Width:0}x{VideoFrame?.Height:0})");
+    }
+
+    private int _diagStats;
 
     /// <summary>
     /// Lee el espacio de color con FFmpeg en segundo plano y se lo pasa al renderer. Carga FFmpeg
@@ -905,6 +922,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
             _videoColor = color;
             d3d.UpdateColorInfo(color);
+            DiagLog.Write($"VM: color sondeado {color}");
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 
