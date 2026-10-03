@@ -3,6 +3,7 @@
 // Software libre, sin garantia alguna. Ver LICENSE para los terminos completos.
 
 using System.Windows.Media;
+using LibVLCSharp.Shared;
 
 // System.Windows.Media tiene su propio MediaPlayer, que choca con el de LibVLC.
 using VlcMediaPlayer = LibVLCSharp.Shared.MediaPlayer;
@@ -10,27 +11,35 @@ using VlcMediaPlayer = LibVLCSharp.Shared.MediaPlayer;
 namespace VideoSerialVisualizer.Helpers;
 
 /// <summary>
-/// Render del video como contenido WPF (en vez de la ventana nativa de LibVLC). Hay dos
-/// implementaciones para poder compararlas: <see cref="VlcFrameRenderer"/> (WriteableBitmap, copia
-/// en el hilo de UI) y <see cref="D3DImageVlcRenderer"/> (EXPERIMENTAL: textura Direct3D 9Ex
-/// compartida con WPF, la copia se hace fuera del hilo de UI).
+/// Render del video como contenido WPF comun (LibVLC entrega los cuadros por callbacks en vez de
+/// dibujar en una ventana nativa). Dos implementaciones: <see cref="D3DImageVlcRenderer"/>
+/// (EXPERIMENTAL, la principal: textura Direct3D 9Ex compartida con WPF, conversion de color en la
+/// GPU) y <see cref="VlcFrameRenderer"/> (respaldo: WriteableBitmap, todo por CPU).
 /// </summary>
 public interface IVlcFrameRenderer : IDisposable
 {
     /// <summary>Nombre corto para mostrar en las estadisticas.</summary>
     string Name { get; }
 
-    /// <summary>Imagen donde se pinta el video. Se crea en <see cref="Attach"/>.</summary>
+    /// <summary>Imagen donde se pinta el video. Puede cambiar de instancia cuando cambia el tamano
+    /// del video (ver <see cref="FrameChanged"/>).</summary>
     ImageSource? Frame { get; }
+
+    /// <summary>Se dispara en el hilo de UI cuando <see cref="Frame"/> pasa a ser otra instancia.</summary>
+    event Action? FrameChanged;
 
     /// <summary>Se dispara en el hilo de UI aprox. una vez por segundo con las mediciones.</summary>
     event Action<RendererStats>? StatsUpdated;
 
-    /// <summary>Conecta el renderer. Igual que antes: con la reproduccion DETENIDA (LibVLC fija el
-    /// destino de video al arrancar) y con el Hwnd ya limpio.</summary>
+    /// <summary>
+    /// Conecta el renderer antes de cada Play. El tamano lo informa VLC despues, al arrancar el video
+    /// (callback de formato), y los recursos se crean recien ahi.
+    /// </summary>
+    /// <param name="media">Media que se va a reproducir: de su pista sale el tamano visible y el
+    /// aspecto de pixel (VLC ofrece el tamano codificado, ver <see cref="VlcVideoGeometry"/>).</param>
     /// <param name="color">Espacio de color del archivo, si se conoce. Solo lo usa el modo I420 de
     /// D3DImage (la conversion la hace el shader); en los demas la hace VLC.</param>
-    void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height, VideoColorInfo? color = null);
+    void Attach(VlcMediaPlayer mediaPlayer, Media? media, VideoColorInfo? color);
 
     /// <summary>Desconecta los callbacks para devolverle el dibujo a LibVLC.</summary>
     void Detach(VlcMediaPlayer mediaPlayer);

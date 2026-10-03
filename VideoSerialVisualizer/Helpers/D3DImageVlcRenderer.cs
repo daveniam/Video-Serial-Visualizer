@@ -24,7 +24,8 @@ namespace VideoSerialVisualizer.Helpers;
 /// <summary>
 /// EXPERIMENTAL (rama experimental/d3dimage). Muestra el video de LibVLC como contenido WPF a traves
 /// de una textura Direct3D 9Ex que WPF compone directo via <see cref="D3DImage"/>. Reemplaza tanto a
-/// la ventana nativa (reproduccion normal) como al WriteableBitmap (modo animador).
+/// la ventana nativa que se usaba en la reproduccion normal como al WriteableBitmap, que queda de
+/// respaldo (ver <see cref="VlcFrameRenderer"/>).
 ///
 /// Dos modos:
 ///   * I420 (el normal): VLC entrega los tres planos Y, U, V tal como salen del decodificador
@@ -138,9 +139,6 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// <summary>Media actual: de su pista de video salen el tamano visible y el aspecto de pixel.</summary>
     private Media? _media;
 
-    /// <summary>Tamano visible conocido de antemano (sondeo con FFmpeg), si no hay pista todavia.</summary>
-    private (int Width, int Height) _visibleHint;
-
     private VideoColorInfo _color;
     private bool _colorDirty;
 
@@ -155,6 +153,9 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     public ImageSource? Frame => _image;
 
     public event Action<RendererStats>? StatsUpdated;
+
+    /// <summary>El D3DImage es siempre el mismo (solo cambia la superficie que muestra): nunca se dispara.</summary>
+    public event Action? FrameChanged { add { } remove { } }
 
     /// <summary>Se dispara (en el hilo de UI) cuando cambia el tamano de visualizacion del video.</summary>
     public event Action<int, int>? VideoSizeChanged;
@@ -275,14 +276,6 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         _device.VertexFormat = VertexFormat.PositionRhw | VertexFormat.Texture1;
     }
 
-    /// <summary>Contrato comun: tamano conocido de antemano (sondeo con FFmpeg). Aca es solo una
-    /// pista por si la pista de video todavia no esta disponible al arrancar.</summary>
-    public void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height, VideoColorInfo? color = null)
-    {
-        _visibleHint = ((int)width, (int)height);
-        Attach(mediaPlayer, null, color);
-    }
-
     /// <summary>
     /// Conecta el renderer al MediaPlayer. Se llama antes de cada Play, con el Hwnd ya limpio (en
     /// LibVLC el Hwnd y los callbacks son excluyentes y gana lo ultimo que se configura). Los
@@ -346,7 +339,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     {
         try
         {
-            var (visibleWidth, visibleHeight, sar) = ResolveVisibleSize((int)width, (int)height);
+            var (visibleWidth, visibleHeight, sar) = VlcVideoGeometry.Resolve(_media, (int)width, (int)height);
             bool recreated;
 
             lock (_sync)
@@ -361,14 +354,14 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
                     // escalar por CPU. El recorte y el aspecto los resuelve el shader.
                     bufferWidth = (int)width;
                     bufferHeight = (int)height;
-                    _targetWidth = Math.Max(1, (int)Math.Round(visibleWidth * sar));
+                    _targetWidth = VlcVideoGeometry.DisplayWidth(visibleWidth, sar);
                     _targetHeight = visibleHeight;
                 }
                 else
                 {
                     // En BGRA VLC convierte por CPU de todas formas: se le pide directamente el tamano
                     // final (visible y con el aspecto aplicado) y el destino recibe una copia exacta.
-                    bufferWidth = _targetWidth = Math.Max(1, (int)Math.Round(visibleWidth * sar));
+                    bufferWidth = _targetWidth = VlcVideoGeometry.DisplayWidth(visibleWidth, sar);
                     bufferHeight = _targetHeight = visibleHeight;
                     visibleWidth = bufferWidth;
                     visibleHeight = bufferHeight;
@@ -415,52 +408,6 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             Debug.WriteLine($"[D3DImage] Fallo al configurar el formato: {ex}");
             return 0;
         }
-    }
-
-    /// <summary>
-    /// Tamano visible y relacion de aspecto de pixel. Salen de la pista de video de la media (VLC
-    /// ya la conoce cuando llama al callback de formato); si no esta, de la pista previa (sondeo) y,
-    /// en ultimo caso, se toma el buffer entero.
-    /// </summary>
-    private (int Width, int Height, double Sar) ResolveVisibleSize(int bufferWidth, int bufferHeight)
-    {
-        int width = 0, height = 0;
-        double sar = 1;
-
-        try
-        {
-            // Media.Tracks solo toma el lock del item, no el del reproductor: es seguro llamarlo
-            // desde el hilo de video (MediaPlayer.Media/Size podrian bloquearse contra un Play/Stop
-            // en curso en el hilo de UI).
-            foreach (var track in _media?.Tracks ?? [])
-            {
-                if (track.TrackType != TrackType.Video)
-                    continue;
-
-                width = (int)track.Data.Video.Width;
-                height = (int)track.Data.Video.Height;
-                if (track.Data.Video.SarNum > 0 && track.Data.Video.SarDen > 0)
-                    sar = (double)track.Data.Video.SarNum / track.Data.Video.SarDen;
-                break;
-            }
-        }
-        catch
-        {
-            // sin pista: se cae a la pista previa o al buffer
-        }
-
-        if (width <= 0 || height <= 0)
-            (width, height) = _visibleHint;
-
-        // Nunca mas grande que el buffer (eso indicaria una pista de otro video o datos raros).
-        if (width <= 0 || height <= 0 || width > bufferWidth || height > bufferHeight)
-            (width, height) = (bufferWidth, bufferHeight);
-
-        // Aspecto absurdo (metadatos rotos): mejor cuadrado que una imagen aplastada.
-        if (sar is < 0.25 or > 4)
-            sar = 1;
-
-        return (width, height, sar);
     }
 
     private bool TargetSizeChanged()

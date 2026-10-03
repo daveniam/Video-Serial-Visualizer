@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:loc="clr-namespace:VideoSerialVisualizer.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
              xmlns:vm="clr-namespace:VideoSerialVisualizer.ViewModels"
              xmlns:helpers="clr-namespace:VideoSerialVisualizer.Helpers"
              mc:Ignorable="d"
@@ -12,8 +11,7 @@
              Background="{StaticResource BgPrimaryBrush}"
              PreviewKeyDown="OnPreviewKeyDown">
     <!-- Atajos del reproductor. Solo se disparan mientras el foco de teclado de WPF esta dentro de
-         este control (ver PlayerView.xaml.cs: se reclama el foco tras cada clic en el video, porque
-         un clic nativo se lo lleva a la ventana hija de LibVLC). Los comandos de loop/segmento/paso
+         este control (ver PlayerView.xaml.cs: se reclama el foco al cargar y tras cada clic). Los comandos de loop/segmento/paso
          a cuadro se auto-protegen con IsAnimatorModeEnabled, asi que quedan activos sin filtrar nada
          aca (en modo normal no hacen nada).
 
@@ -51,39 +49,24 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!--
-             El video se renderiza en una ventana nativa de Windows embebida (HwndHost), no como
-             un elemento grafico normal de WPF. Esas ventanas nativas siempre se dibujan por encima
-             de cualquier control WPF con el que se superpongan, sin importar el z-order del XAML
-             ("airspace problem"). Por eso el VideoView NUNCA debe compartir fila/celda con controles:
-             tiene su propia fila y los controles van en filas separadas, sin superposicion.
-        -->
         <Button Grid.Row="0" Style="{StaticResource BackButtonStyle}" HorizontalAlignment="Left" Margin="16"
                 Click="BackButton_Click"
                 Command="{Binding BackCommand}" ToolTip="{loc:Tr Player_BackToLibrary}" />
 
-        <!-- El video se aloja en una ventana nativa hija (MediaPlayer.Hwnd) via WindowsFormsHost.
-             Se evita a proposito el VideoView de LibVLCSharp.WPF: ese usa una ventana superpuesta
-             separada que debe seguir la posicion del control en pantalla, y con multi-monitor / DPI
-             calcula mal y termina mostrando el video enorme en una ventana aparte. -->
-        <!-- Tres formas de mostrar el video, mutuamente excluyentes:
-               1. Ventana nativa de LibVLC: el camino rapido, con el modo animador apagado.
-               2. Imagen WPF en vivo (render por callbacks): en modo animador, para que el video sea
-                  contenido WPF y pueda transparentarse / llevarse a la ventana flotante.
-               3. Imagen WPF del cuadro exacto de FFmpeg: mientras se revisa cuadro a cuadro.
-             EXPERIMENTAL (rama experimental/d3dimage): con Direct3D 9Ex disponible, la 2 (via
-             D3DImage) se usa SIEMPRE, tambien con el modo animador apagado; la 1 queda solo como
-             respaldo si D3D no arranca o con VSV_RENDERER=bitmap. -->
-
-        <!-- El clic va en el contenedor (y no en cada Image) para que tambien funcione sobre las bandas
-             negras, como pasaba con la superficie nativa. -->
+        <!-- El video es contenido WPF comun (render por callbacks de LibVLC, ver IVlcFrameRenderer):
+             D3DImage si hay Direct3D 9Ex, WriteableBitmap si no. Antes se dibujaba en una ventana
+             nativa (WindowsFormsHost), que siempre tapaba a cualquier control WPF superpuesto
+             ("airspace"); eso obligaba a poner el boton de play en un Popup aparte, a suspender el
+             video al redimensionar y a recuperar el foco que la ventana nativa robaba. Ya no aplica.
+             Dos imagenes, mutuamente excluyentes:
+               1. El video en vivo.
+               2. El cuadro exacto de FFmpeg, mientras se revisa cuadro a cuadro (modo animador).
+             El clic va en el contenedor (y no en cada Image) para que tambien funcione sobre las
+             bandas negras. -->
         <Grid Grid.Row="1" x:Name="VideoArea" Background="Black"
               MouseLeftButtonDown="VideoArea_MouseLeftButtonDown">
-            <wfi:WindowsFormsHost x:Name="VideoHost" Background="Black"
-                                   Visibility="{Binding ShowNativeVideoSurface, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
             <Image Source="{Binding VideoFrame}" Stretch="Uniform"
-                   Visibility="{Binding IsCallbackVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                   Visibility="{Binding IsLiveVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <Image Source="{Binding FrameStepImage}" Stretch="Uniform"
                    Visibility="{Binding IsFrameStepVisibleInMain, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -91,7 +74,7 @@
             <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. -->
             <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="6,3"
                     Background="#B0000000" CornerRadius="4" IsHitTestVisible="False"
-                    Visibility="{Binding IsCallbackVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    Visibility="{Binding IsLiveVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="{Binding RendererStatsText}" Foreground="#FFFF6B6B" FontSize="11"
                            FontFamily="Consolas" />
             </Border>
@@ -116,31 +99,22 @@
                            HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" />
             </StackPanel>
 
-            <!-- Boton de play grande al centro (estilo YouTube) cuando el video esta pausado.
-                 Va en un Popup a proposito: el video normal se dibuja en una ventana NATIVA (ver
-                 arriba, "airspace problem") que taparia cualquier control WPF superpuesto. El Popup
-                 se renderiza en su propia ventana por encima, asi que aparece sobre el video en
-                 cualquiera de los tres modos de dibujo. Placement=Center lo centra sobre el video.
-
-                 Como es una ventana top-level aparte, el code-behind (PlayerView.xaml.cs) se encarga
-                 de: reposicionarla cuando la ventana principal se mueve/redimensiona/restaura, y
-                 marcarla WS_EX_NOACTIVATE al abrirse para que no robe la activacion. -->
-            <Popup x:Name="PlayOverlayPopup"
-                   PlacementTarget="{Binding ElementName=VideoArea}" Placement="Center"
-                   AllowsTransparency="True" StaysOpen="True" Focusable="False" PopupAnimation="None"
-                   Opened="PlayOverlayPopup_Opened"
-                   IsOpen="{Binding IsPlayOverlayVisible, Mode=OneWay}">
-                <Button Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayPauseCommand}"
-                        ToolTip="{loc:Tr Player_PlayPause}" Width="72" Height="72" Focusable="False">
-                    <Grid>
-                        <Ellipse Fill="#B0000000" />
-                        <Ellipse Stroke="#40FFFFFF" StrokeThickness="1" />
-                        <!-- Triangulo de play, apenas corrido a la derecha para verse centrado. -->
-                        <Path Data="M 0,0 L 22,13 L 0,26 Z" Fill="White"
-                              HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0" />
-                    </Grid>
-                </Button>
-            </Popup>
+            <!-- Boton de play grande al centro (estilo YouTube) cuando el video esta pausado. Es un
+                 control comun superpuesto al video: como el video ya no es una ventana nativa, no lo
+                 tapa. El Button marca el clic como manejado, asi no llega al VideoArea (que tambien
+                 alternaria play/pausa). -->
+            <Button Style="{StaticResource PlainButtonStyle}" Command="{Binding PlayPauseCommand}"
+                    ToolTip="{loc:Tr Player_PlayPause}" Width="72" Height="72" Focusable="False"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding IsPlayOverlayVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid>
+                    <Ellipse Fill="#B0000000" />
+                    <Ellipse Stroke="#40FFFFFF" StrokeThickness="1" />
+                    <!-- Triangulo de play, apenas corrido a la derecha para verse centrado. -->
+                    <Path Data="M 0,0 L 22,13 L 0,26 Z" Fill="White"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0" />
+                </Grid>
+            </Button>
         </Grid>
 
         <!-- En pantalla completa esta barra se oculta sola y solo reaparece con el mouse encima
@@ -162,8 +136,7 @@
             </Border.Style>
             <StackPanel>
                 <!-- Aviso breve tras fijar la portada del grupo (clic derecho en la barra). Va aca, en
-                     la barra de controles (contenido WPF normal), y no sobre el video: ahi la ventana
-                     nativa de LibVLC lo taparia (airspace). -->
+                     la barra de controles, y no sobre el video. -->
                 <Border Visibility="{Binding IsCoverFeedbackVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                         Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="6" Padding="10,5" Margin="0,0,0,8"
                         HorizontalAlignment="Center">

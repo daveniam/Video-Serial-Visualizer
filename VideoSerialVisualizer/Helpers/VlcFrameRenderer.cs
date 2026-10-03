@@ -19,23 +19,27 @@ namespace VideoSerialVisualizer.Helpers;
 /// Hace que LibVLC entregue los cuadros en memoria en vez de dibujarlos el mismo, y los pinta en un
 /// <see cref="WriteableBitmap"/> que se puede mostrar con un Image comun de WPF.
 ///
-/// Por que existe: normalmente LibVLC dibuja en una ventana NATIVA de Windows (ver PlayerView.xaml),
-/// que queda fuera del compositor de WPF. Eso trae dos consecuencias: no se le puede aplicar la
-/// opacidad de la ventana (el video se ve solido aunque todo lo demas se transparente) y nada de WPF
-/// puede dibujarse encima. Con este camino el video pasa a ser contenido WPF normal y ambos
-/// problemas desaparecen. Medido: 1080p30 sostiene 30 fps sin perder cuadros.
+/// Es el RESPALDO de <see cref="D3DImageVlcRenderer"/>: se usa solo si Direct3D 9Ex no arranca (o
+/// con VSV_RENDERER=bitmap). Funciona en cualquier equipo, pero VLC convierte cada cuadro a BGRA
+/// por CPU y el hilo de UI copia el cuadro entero en cada fotograma. Medido: 1080p30 sostiene
+/// 30 fps sin perder cuadros.
 ///
-/// El costo es una copia del cuadro por fotograma; a cambio se pierde la presentacion acelerada por
-/// hardware, asi que se usa solo donde hace falta (la ventana de referencia flotante), no en la
-/// reproduccion normal.
+/// El tamano lo informa VLC al arrancar cada video (callback de formato); se le pide BGRA ya al
+/// tamano de visualizacion (visible y con el aspecto de pixel aplicado, ver
+/// <see cref="VlcVideoGeometry"/>), asi la imagen sale lista para mostrar.
 /// </summary>
 public sealed class VlcFrameRenderer : IVlcFrameRenderer
 {
     private readonly Dispatcher _dispatcher;
 
+    /// <summary>Protege el buffer: VLC lo reemplaza al cambiar de video y la UI lo lee al pintar.</summary>
+    private readonly object _sync = new();
+
     // Los delegados DEBEN mantenerse referenciados mientras LibVLC los tenga registrados: si el
     // recolector de basura los libera, el codigo nativo llama a memoria muerta y el proceso se cae
     // sin excepcion atrapable desde .NET.
+    private VlcMediaPlayer.LibVLCVideoFormatCb? _formatCb;
+    private VlcMediaPlayer.LibVLCVideoCleanupCb? _cleanupCb;
     private VlcMediaPlayer.LibVLCVideoLockCb? _lockCb;
     private VlcMediaPlayer.LibVLCVideoUnlockCb? _unlockCb;
     private VlcMediaPlayer.LibVLCVideoDisplayCb? _displayCb;
@@ -43,7 +47,10 @@ public sealed class VlcFrameRenderer : IVlcFrameRenderer
     private IntPtr _buffer;
     private int _bufferSize;
     private int _pitch;
-    private Int32Rect _frameRect;
+    private int _width;
+    private int _height;
+
+    private Media? _media;
 
     /// <summary>1 mientras hay un repintado en vuelo: si VLC entrega mas rapido de lo que la UI
     /// pinta, se descartan cuadros en vez de encolarlos y quedar cada vez mas atrasado.</summary>
@@ -53,7 +60,8 @@ public sealed class VlcFrameRenderer : IVlcFrameRenderer
 
     private readonly RendererStatsCounter _stats = new("WriteableBitmap");
 
-    /// <summary>Imagen donde se pinta el video. Se crea al configurar el tamano.</summary>
+    /// <summary>Imagen donde se pinta el video. Se recrea (en el hilo de UI) cuando cambia el tamano;
+    /// ver <see cref="FrameChanged"/>.</summary>
     public WriteableBitmap? Frame { get; private set; }
 
     ImageSource? IVlcFrameRenderer.Frame => Frame;
@@ -62,33 +70,20 @@ public sealed class VlcFrameRenderer : IVlcFrameRenderer
 
     public event Action<RendererStats>? StatsUpdated;
 
-    /// <summary>Se dispara (en el hilo de UI) la primera vez que hay un cuadro pintado, para que la
-    /// vista pueda enlazar la imagen recien entonces.</summary>
-    public event Action? FrameReady;
+    public event Action? FrameChanged;
 
     public VlcFrameRenderer(Dispatcher dispatcher) => _dispatcher = dispatcher;
 
-    /// <summary>
-    /// Conecta el renderer a un MediaPlayer. Debe llamarse con la reproduccion DETENIDA: LibVLC fija
-    /// el destino de video al arrancar, asi que cambiarlo con el video andando no tiene efecto.
-    /// </summary>
-    public void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height, VideoColorInfo? color = null)
+    public void Attach(VlcMediaPlayer mediaPlayer, Media? media, VideoColorInfo? color)
     {
-        if (_isDisposed || width == 0 || height == 0)
+        if (_isDisposed)
             return;
 
-        FreeBuffer();
+        lock (_sync)
+            _media = media;
 
-        _pitch = (int)width * 4;
-        _bufferSize = _pitch * (int)height;
-        _buffer = Marshal.AllocHGlobal(_bufferSize);
-        _frameRect = new Int32Rect(0, 0, (int)width, (int)height);
-
-        // El bitmap vive en el hilo de UI (es un objeto de WPF con afinidad de hilo).
-        _dispatcher.Invoke(() =>
-        {
-            Frame = new WriteableBitmap((int)width, (int)height, 96, 96, PixelFormats.Bgra32, null);
-        });
+        _formatCb = OnVideoFormat;
+        _cleanupCb = (ref IntPtr _) => { };
 
         _lockCb = (_, planes) =>
         {
@@ -98,68 +93,139 @@ public sealed class VlcFrameRenderer : IVlcFrameRenderer
 
         _unlockCb = (_, _, _) => { };
 
-        _displayCb = (_, _) =>
-        {
-            if (_isDisposed)
-                return;
+        _displayCb = (_, _) => OnFrameDecoded();
 
-            if (Interlocked.CompareExchange(ref _pendingPaint, 1, 0) != 0)
-            {
-                _stats.AddDropped();
-                return;
-            }
-
-            _dispatcher.BeginInvoke(() =>
-            {
-                try
-                {
-                    if (!_isDisposed && Frame is not null && _buffer != IntPtr.Zero)
-                    {
-                        var start = System.Diagnostics.Stopwatch.GetTimestamp();
-                        Frame.WritePixels(_frameRect, _buffer, _bufferSize, _pitch);
-                        FrameReady?.Invoke();
-                        if (_stats.AddPresented(System.Diagnostics.Stopwatch.GetTimestamp() - start) is { } stats)
-                            StatsUpdated?.Invoke(stats);
-                    }
-                }
-                catch
-                {
-                    // Un fallo puntual al pintar no debe tumbar la reproduccion: se saltea el cuadro.
-                }
-                finally
-                {
-                    Interlocked.Exchange(ref _pendingPaint, 0);
-                }
-            }, DispatcherPriority.Render);
-        };
-
-        // BGRA es exactamente el formato que consume WriteableBitmap: sin conversion de color extra.
-        mediaPlayer.SetVideoFormat("BGRA", width, height, (uint)_pitch);
+        mediaPlayer.SetVideoFormatCallbacks(_formatCb, _cleanupCb);
         mediaPlayer.SetVideoCallbacks(_lockCb, _unlockCb, _displayCb);
     }
 
     /// <summary>
-    /// Desconecta los callbacks para que LibVLC vuelva a dibujar por su cuenta. Igual que Attach,
-    /// requiere la reproduccion detenida.
+    /// Hilo de VLC, al arrancar cada video: se pide BGRA al tamano de visualizacion (VLC convierte y
+    /// escala). Si el tamano cambio, se reemplaza el buffer y la UI recrea el bitmap.
     /// </summary>
+    private uint OnVideoFormat(ref IntPtr opaque, IntPtr chroma, ref uint width, ref uint height,
+        ref uint pitches, ref uint lines)
+    {
+        try
+        {
+            var (visibleWidth, visibleHeight, sar) = VlcVideoGeometry.Resolve(_media, (int)width, (int)height);
+            var targetWidth = VlcVideoGeometry.DisplayWidth(visibleWidth, sar);
+            bool resized;
+
+            lock (_sync)
+            {
+                if (_isDisposed)
+                    return 0;
+
+                resized = targetWidth != _width || visibleHeight != _height || _buffer == IntPtr.Zero;
+                if (resized)
+                {
+                    FreeBuffer();
+                    _width = targetWidth;
+                    _height = visibleHeight;
+                    _pitch = _width * 4;
+                    _bufferSize = _pitch * _height;
+                    _buffer = Marshal.AllocHGlobal(_bufferSize);
+                }
+
+                Interlocked.Exchange(ref _pendingPaint, 0);
+            }
+
+            // BGRA es exactamente el formato que consume WriteableBitmap: sin conversion extra.
+            Marshal.Copy("BGRA"u8.ToArray(), 0, chroma, 4);
+            width = (uint)_width;
+            height = (uint)_height;
+            pitches = (uint)_pitch;
+            lines = (uint)_height;
+
+            if (resized)
+            {
+                var (w, h) = (_width, _height);
+                // BeginInvoke, nunca Invoke: este es el hilo de VLC y la UI podria estar esperandolo
+                // (p.ej. dentro de MediaPlayer.Stop), lo que seria un deadlock.
+                _dispatcher.BeginInvoke(() =>
+                {
+                    if (_isDisposed)
+                        return;
+
+                    Frame = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
+                    FrameChanged?.Invoke();
+                });
+            }
+
+            return 1;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private void OnFrameDecoded()
+    {
+        if (_isDisposed)
+            return;
+
+        if (Interlocked.CompareExchange(ref _pendingPaint, 1, 0) != 0)
+        {
+            _stats.AddDropped();
+            return;
+        }
+
+        _dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                var start = System.Diagnostics.Stopwatch.GetTimestamp();
+                lock (_sync)
+                {
+                    // El bitmap se recrea un instante despues que el buffer: hasta entonces los
+                    // tamanos no coinciden y el cuadro se saltea.
+                    if (_isDisposed || Frame is null || _buffer == IntPtr.Zero
+                        || Frame.PixelWidth != _width || Frame.PixelHeight != _height)
+                        return;
+
+                    Frame.WritePixels(new Int32Rect(0, 0, _width, _height), _buffer, _bufferSize, _pitch);
+                }
+
+                if (_stats.AddPresented(System.Diagnostics.Stopwatch.GetTimestamp() - start) is { } stats)
+                    StatsUpdated?.Invoke(stats);
+            }
+            catch
+            {
+                // Un fallo puntual al pintar no debe tumbar la reproduccion: se saltea el cuadro.
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _pendingPaint, 0);
+            }
+        }, DispatcherPriority.Render);
+    }
+
+    /// <summary>Desconecta los callbacks (la API nativa acepta NULL como "sin callbacks").</summary>
     public void Detach(VlcMediaPlayer mediaPlayer)
     {
         try
         {
-            // La firma administrada pide delegados no nulos, pero la API nativa acepta NULL como
-            // "sin callbacks": es la unica forma de devolverle el dibujo a LibVLC.
             mediaPlayer.SetVideoCallbacks(null!, null!, null!);
+            mediaPlayer.SetVideoFormatCallbacks(null!, null!);
         }
         catch
         {
             // best effort
         }
 
+        lock (_sync)
+            _media = null;
+
+        _formatCb = null;
+        _cleanupCb = null;
         _lockCb = null;
         _unlockCb = null;
         _displayCb = null;
     }
 
+    /// <summary>Con <see cref="_sync"/> tomado.</summary>
     private void FreeBuffer()
     {
         if (_buffer == IntPtr.Zero)
@@ -170,15 +236,24 @@ public sealed class VlcFrameRenderer : IVlcFrameRenderer
         Marshal.FreeHGlobal(toFree);
     }
 
+    /// <summary>Debe llamarse con la reproduccion DETENIDA: VLC escribe en el buffer fuera del lock
+    /// (entre lock y display), asi que liberarlo con el video andando seria un crash nativo.</summary>
     public void Dispose()
     {
         if (_isDisposed)
             return;
 
         _isDisposed = true;
+        lock (_sync)
+        {
+            FreeBuffer();
+            _media = null;
+        }
+
+        _formatCb = null;
+        _cleanupCb = null;
         _lockCb = null;
         _unlockCb = null;
         _displayCb = null;
-        FreeBuffer();
     }
 }

@@ -42,7 +42,6 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private long _lastScrubSeekTick;
     private bool _hasLoadedSubtitleTracks;
     private bool _isSyncingSubtitleSelection;
-    private IntPtr _videoHwnd;
 
     /// <summary>Ventana (en ms) antes del final durante la cual se rellena el boton "Siguiente".</summary>
     private const double NextFillWindowMs = 30_000;
@@ -91,8 +90,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     //
     // LibVLC solo sabe avanzar un cuadro exacto (NextFrame), no retroceder. Para tener paso a
     // cuadro EXACTO en ambos sentidos se usa un decodificador FFmpeg aparte (FFMediaToolkit): al
-    // entrar en este modo, VLC se pausa y el area de video (ventana nativa, ver PlayerView.xaml)
-    // se reemplaza por una imagen WPF con el cuadro que decodifica FFmpeg. Se sale del modo
+    // entrar en este modo, VLC se pausa y el video en vivo (ver PlayerView.xaml) se
+    // reemplaza por una imagen WPF con el cuadro que decodifica FFmpeg. Se sale del modo
     // reanudando la reproduccion (Play/clic), momento en que VLC retoma desde la misma posicion.
     private static bool _ffmpegPathConfigured;
     private MediaFile? _frameStepFile;
@@ -249,8 +248,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     public const double MinWindowOpacityPercent = 20;
 
     /// <summary>
-    /// Opacidad de TODA la ventana (20-100), no solo del video: se aplica a nivel Win32 para que
-    /// alcance tambien a la ventana nativa donde dibuja LibVLC (ver WindowEffectsHelper).
+    /// Opacidad de TODA la ventana de referencia (20-100), video incluido: el video es contenido WPF,
+    /// asi que la transparencia de la ventana lo alcanza (ver WindowEffectsHelper).
     /// </summary>
     [ObservableProperty]
     private double windowOpacityPercent = 100;
@@ -338,7 +337,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Activo mientras se muestra un cuadro exacto decodificado por FFmpeg en vez del video en vivo
-    /// de VLC. La vista oculta la superficie nativa y muestra <see cref="FrameStepImage"/> en su lugar.
+    /// de VLC. La vista oculta el video en vivo y muestra <see cref="FrameStepImage"/> en su lugar.
     /// </summary>
     [ObservableProperty]
     private bool isFrameStepActive;
@@ -352,8 +351,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private int? currentFrameNumber;
 
     /// <summary>
-    /// Cuadro en vivo cuando el video se dibuja como imagen WPF (modo animador) en vez de en la
-    /// ventana nativa de LibVLC. Ver <see cref="VlcFrameRenderer"/> para el por que.
+    /// Cuadro en vivo: el video es siempre contenido WPF, dibujado por el renderer (ver
+    /// <see cref="IVlcFrameRenderer"/>). Cambia de instancia si el renderer recrea su imagen.
     /// </summary>
     [ObservableProperty]
     private System.Windows.Media.ImageSource? videoFrame;
@@ -363,37 +362,16 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? rendererStatsText;
 
-    /// <summary>El video se esta dibujando por callbacks (imagen WPF) y no en la ventana nativa.</summary>
-    [ObservableProperty]
-    private bool isCallbackRenderingActive;
-
     // Con la ventana de referencia abierta, la ventana principal deja de dibujar el video: las dos
     // muestran el MISMO bitmap (VLC decodifica y se copia una sola vez), pero WPF lo compondria dos
     // veces. Y sobre todo: mientras se usa la referencia flotando sobre otro programa, nadie esta
     // mirando el video de la ventana principal, asi que ese trabajo es puro desperdicio.
 
-    /// <summary>La ventana nativa de LibVLC es la que muestra el video ahora mismo.</summary>
-    public bool IsNativeVideoVisible => !IsFrameStepActive && !IsCallbackRenderingActive && !IsReferenceWindowOpen;
-
-    /// <summary>
-    /// Se DIBUJA la superficie nativa del video. Es lo que consume el WindowsFormsHost de la vista.
-    /// Se suspende mientras se redimensiona la ventana (<see cref="IsResizingWindow"/>): con la
-    /// decodificacion por hardware apagada, VLC reescala cada cuadro por CPU y el WindowsFormsHost
-    /// reubica su ventana nativa en cada pixel del arrastre, que es lo que traba. Se colapsa (queda
-    /// el fondo negro) y se restaura al soltar, ya con el tamano final.
-    /// </summary>
-    public bool ShowNativeVideoSurface => IsNativeVideoVisible && !IsResizingWindow;
-
-    /// <summary>La imagen WPF del render por callbacks es la que muestra el video ahora mismo.</summary>
-    public bool IsCallbackVideoVisible => !IsFrameStepActive && IsCallbackRenderingActive && !IsReferenceWindowOpen;
+    /// <summary>El video en vivo se muestra en la ventana principal.</summary>
+    public bool IsLiveVideoVisible => !IsFrameStepActive && !IsReferenceWindowOpen;
 
     /// <summary>El cuadro congelado del paso a cuadro se muestra en la ventana principal.</summary>
     public bool IsFrameStepVisibleInMain => IsFrameStepActive && !IsReferenceWindowOpen;
-
-    /// <summary>La ventana principal esta activa. Cuando no lo esta, el overlay de play se oculta para
-    /// que no quede flotando por encima de otras aplicaciones (el Popup vive en su propia ventana).</summary>
-    [ObservableProperty]
-    private bool isWindowActive = true;
 
     /// <summary>Estado de pantalla completa. Lo maneja la vista (PlayerView.xaml.cs, que es quien
     /// puede tocar la ventana); aca solo vive para que el boton muestre el icono correcto.</summary>
@@ -414,14 +392,6 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     partial void OnIsControlsBarHoveredChanged(bool value) => OnPropertyChanged(nameof(ShowControlsBar));
 
-    /// <summary>La ventana se esta redimensionando ahora mismo (la vista lo detecta por los mensajes
-    /// del ciclo de arrastre). Mientras dura, se suspende la superficie nativa del video para que el
-    /// redimensionado sea fluido (ver <see cref="ShowNativeVideoSurface"/>).</summary>
-    [ObservableProperty]
-    private bool isResizingWindow;
-
-    partial void OnIsResizingWindowChanged(bool value) => OnPropertyChanged(nameof(ShowNativeVideoSurface));
-
     /// <summary>
     /// Boton de play grande al centro del video (estilo YouTube), visible solo con el video pausado.
     /// Se excluye el paso a cuadro (ya tiene su cuadro congelado) y la ventana de referencia (el
@@ -429,18 +399,14 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     /// </summary>
     public bool IsPlayOverlayVisible =>
         CurrentVideo is not null && _playbackStarted && !IsPlaying
-        && !IsFrameStepActive && !IsReferenceWindowOpen && IsWindowActive;
+        && !IsFrameStepActive && !IsReferenceWindowOpen;
 
     private void NotifyVideoSurfaceVisibilityChanged()
     {
-        OnPropertyChanged(nameof(IsNativeVideoVisible));
-        OnPropertyChanged(nameof(ShowNativeVideoSurface));
-        OnPropertyChanged(nameof(IsCallbackVideoVisible));
+        OnPropertyChanged(nameof(IsLiveVideoVisible));
         OnPropertyChanged(nameof(IsFrameStepVisibleInMain));
         OnPropertyChanged(nameof(IsPlayOverlayVisible));
     }
-
-    partial void OnIsCallbackRenderingActiveChanged(bool value) => NotifyVideoSurfaceVisibilityChanged();
 
     partial void OnIsFrameStepActiveChanged(bool value) => NotifyVideoSurfaceVisibilityChanged();
 
@@ -450,7 +416,6 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     partial void OnCurrentVideoChanged(Video? value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
 
-    partial void OnIsWindowActiveChanged(bool value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
 
     // --- Portada del grupo / miniatura del video (clic derecho en la barra) ---
     //
@@ -729,22 +694,6 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         };
     }
 
-    /// <summary>
-    /// La vista registra su ventana nativa (Hwnd) al cargarse; LibVLC renderiza el video dentro de
-    /// ella en vez de crear su propia ventana flotante. Debe llamarse ANTES de reproducir.
-    /// </summary>
-    public void AttachVideoSurface(IntPtr hwnd)
-    {
-        _videoHwnd = hwnd;
-        MediaPlayer.Hwnd = hwnd;
-    }
-
-    public void DetachVideoSurface()
-    {
-        _videoHwnd = IntPtr.Zero;
-        MediaPlayer.Hwnd = IntPtr.Zero;
-    }
-
     public async Task LoadVideoAsync(Video video, IReadOnlyList<Video>? playlist = null)
     {
         // Al encadenar con el siguiente video el actual ya termino: su progreso se guardo como
@@ -851,12 +800,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
         if (IsAnimatorModeEnabled)
         {
-            // En modo animador el sondeo con FFmpeg se hace ANTES de reproducir y se espera: hace
-            // falta el tamano del video para configurar el render por callbacks. De paso quedan
-            // listos fps y cantidad de cuadros desde el primer instante, asi las marcas de la barra
-            // y los botones de paso a cuadro no aparecen con retraso.
-            // EXPERIMENTAL (d3dimage): de paso se lee el espacio de color, que necesita el shader
-            // YUV->RGB. Va despues de abrir el archivo porque recien ahi FFmpeg esta cargado.
+            // En modo animador el sondeo con FFmpeg se hace ANTES de reproducir y se espera: asi
+            // quedan listos fps y cantidad de cuadros desde el primer instante, y las marcas de la
+            // barra y los botones de paso a cuadro no aparecen con retraso. De paso se lee el espacio
+            // de color, que necesita el shader YUV->RGB de D3D (va despues de abrir el archivo porque
+            // recien ahi FFmpeg esta cargado).
             var path = video.RutaAbsoluta;
             _videoColor = await Task.Run(() =>
             {
@@ -875,69 +823,60 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// EXPERIMENTAL (rama experimental/d3dimage): decide como se dibuja el video antes de cada Play.
-    /// Con Direct3D 9Ex disponible, SIEMPRE por D3DImage (reproduccion normal y modo animador): el
-    /// video pasa a ser contenido WPF y la ventana nativa del WindowsFormsHost queda sin uso. Si no
-    /// esta disponible, el comportamiento de siempre: ventana nativa, o WriteableBitmap en modo
-    /// animador. VSV_RENDERER=bitmap fuerza el comportamiento de siempre para comparar.
+    /// Conecta el renderer antes de cada Play. El video es SIEMPRE contenido WPF (ver
+    /// <see cref="IVlcFrameRenderer"/>): D3DImage si Direct3D 9Ex arranca (EXPERIMENTAL, rama
+    /// experimental/d3dimage), WriteableBitmap si no. Ya no existe el camino de ventana nativa.
+    /// VSV_RENDERER=bitmap fuerza el WriteableBitmap y VSV_RENDERER=d3d-bgra el D3DImage sin shader,
+    /// para comparar.
     /// </summary>
     private void ConfigureVideoOutput(string path)
     {
-        if (EnsureD3DRenderer() is { } d3d)
-        {
-            // Mismo orden que AttachFrameRenderer: el Hwnd se limpia ANTES de registrar callbacks.
-            MediaPlayer.Hwnd = IntPtr.Zero;
-            d3d.Attach(MediaPlayer, _media, _videoColor);
-            VideoFrame = d3d.Frame;
-            IsCallbackRenderingActive = true;
+        var renderer = EnsureFrameRenderer();
 
-            // Fuera del modo animador no se abrio el archivo con FFmpeg: el video arranca con la
-            // matriz de color por convencion y se corrige al terminar el sondeo (unos ms despues).
-            if (_videoColor is null)
-                ProbeColorInBackground(path, d3d);
-            return;
-        }
+        // En LibVLC "dibujar en una ventana" y "entregar los cuadros por callbacks" son excluyentes y
+        // gana lo ultimo que se configura; sin Hwnd y sin callbacks, VLC abre su PROPIA ventana
+        // flotante. Nada fija el Hwnd hoy, pero se limpia igual por las dudas, y siempre ANTES de
+        // registrar los callbacks.
+        MediaPlayer.Hwnd = IntPtr.Zero;
+        renderer.Attach(MediaPlayer, _media, _videoColor);
+        VideoFrame = renderer.Frame;
 
-        if (IsAnimatorModeEnabled)
-            AttachFrameRenderer();
-        else
-            DetachFrameRenderer();
+        // Fuera del modo animador no se abrio el archivo con FFmpeg: el video arranca con la matriz
+        // de color por convencion y se corrige al terminar el sondeo (unos ms despues). Solo importa
+        // para el shader de D3D; en los otros modos la conversion la hace VLC.
+        if (_videoColor is null && renderer is D3DImageVlcRenderer d3d)
+            ProbeColorInBackground(path, d3d);
     }
-
-    /// <summary>D3D no se pudo inicializar en esta sesion: no se reintenta en cada video.</summary>
-    private bool _d3dUnavailable;
 
     /// <summary>Descarta sondeos de color de un video anterior que terminan tarde.</summary>
     private int _colorProbeGeneration;
 
     /// <summary>
-    /// El renderer D3D vive mientras viva el reproductor (se reutiliza entre videos: los recursos de
-    /// GPU se recrean solos cuando cambia el tamano). Null si no esta disponible o esta forzado el
-    /// render de siempre.
+    /// El renderer vive mientras viva el reproductor y se reutiliza entre videos: sus recursos se
+    /// recrean solos cuando cambia el tamano. Se elige una sola vez por sesion.
     /// </summary>
-    private D3DImageVlcRenderer? EnsureD3DRenderer()
+    private IVlcFrameRenderer EnsureFrameRenderer()
     {
-        if (_frameRenderer is D3DImageVlcRenderer existing)
-            return existing;
+        if (_frameRenderer is not null)
+            return _frameRenderer;
 
+        var dispatcher = App.Current.Dispatcher;
         var forced = Environment.GetEnvironmentVariable("VSV_RENDERER")?.Trim().ToLowerInvariant();
-        if (_d3dUnavailable || forced == "bitmap")
-            return null;
 
-        var d3d = D3DImageVlcRenderer.TryCreate(App.Current.Dispatcher, preferI420: forced != "d3d-bgra");
-        if (d3d is null)
-        {
-            _d3dUnavailable = true;
-            return null;
-        }
+        _frameRenderer = (forced != "bitmap"
+                ? D3DImageVlcRenderer.TryCreate(dispatcher, preferI420: forced != "d3d-bgra")
+                : null)
+            ?? (IVlcFrameRenderer)new VlcFrameRenderer(dispatcher);
 
-        // Si habia otro renderer (no deberia: la eleccion no cambia en la sesion), se descarta.
-        DetachFrameRenderer();
-
-        _frameRenderer = d3d;
-        d3d.StatsUpdated += OnRendererStatsUpdated;
-        return d3d;
+        _frameRenderer.StatsUpdated += OnRendererStatsUpdated;
+        _frameRenderer.FrameChanged += OnRendererFrameChanged;
+        return _frameRenderer;
     }
+
+    private void OnRendererStatsUpdated(RendererStats stats) => RendererStatsText = stats.ToString();
+
+    // El WriteableBitmap se recrea cuando cambia el tamano del video: hay que reenlazarlo.
+    private void OnRendererFrameChanged() => VideoFrame = _frameRenderer?.Frame;
 
     /// <summary>
     /// Lee el espacio de color con FFmpeg en segundo plano y se lo pasa al renderer. Carga FFmpeg
@@ -967,65 +906,6 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             _videoColor = color;
             d3d.UpdateColorInfo(color);
         }, TaskScheduler.FromCurrentSynchronizationContext());
-    }
-
-    /// <summary>
-    /// Pasa el video al render por callbacks (imagen WPF). Si el sondeo con FFmpeg no pudo abrir el
-    /// archivo, se queda con la ventana nativa: es preferible perder la transparencia que no poder
-    /// ver el video.
-    /// </summary>
-    private void AttachFrameRenderer()
-    {
-        var size = _frameStepFile?.Video.Info.FrameSize;
-        if (size is not { Width: > 0, Height: > 0 })
-        {
-            DetachFrameRenderer();
-            return;
-        }
-
-        // El ORDEN importa: en LibVLC "dibujar en una ventana" y "entregar los cuadros por callbacks"
-        // son excluyentes y gana lo ultimo que se configura. Si se fijara el Hwnd DESPUES de los
-        // callbacks, VLC los descartaria y volveria a modo ventana; como el handle es nulo, se
-        // crearia su propia ventana flotante aparte (sintoma: el video en vivo aparece en una
-        // ventana suelta y la imagen WPF nunca se actualiza). Por eso el Hwnd se limpia primero.
-        MediaPlayer.Hwnd = IntPtr.Zero;
-
-        if (_frameRenderer is null)
-        {
-            _frameRenderer = CreateFrameRenderer();
-            _frameRenderer.StatsUpdated += OnRendererStatsUpdated;
-        }
-
-        _frameRenderer.Attach(MediaPlayer, (uint)size.Value.Width, (uint)size.Value.Height, _videoColor);
-
-        VideoFrame = _frameRenderer.Frame;
-        IsCallbackRenderingActive = true;
-    }
-
-    /// <summary>Respaldo cuando D3D no esta disponible (ver <see cref="ConfigureVideoOutput"/>).</summary>
-    private static IVlcFrameRenderer CreateFrameRenderer() => new VlcFrameRenderer(App.Current.Dispatcher);
-
-    private void OnRendererStatsUpdated(RendererStats stats) => RendererStatsText = stats.ToString();
-
-    /// <summary>Devuelve el dibujo del video a la ventana nativa de LibVLC (camino rapido normal).</summary>
-    private void DetachFrameRenderer()
-    {
-        if (_frameRenderer is not null)
-        {
-            _frameRenderer.StatsUpdated -= OnRendererStatsUpdated;
-            _frameRenderer.Detach(MediaPlayer);
-            _frameRenderer.Dispose();
-            _frameRenderer = null;
-        }
-
-        VideoFrame = null;
-        RendererStatsText = null;
-        IsCallbackRenderingActive = false;
-
-        // Reafirmar el Hwnd justo antes de reproducir: si LibVLC no tiene una ventana de destino
-        // al hacer Play, crea la suya propia (video flotante en una ventana aparte).
-        if (_videoHwnd != IntPtr.Zero)
-            MediaPlayer.Hwnd = _videoHwnd;
     }
 
     // Los handlers de MediaPlayer se disparan en el hilo interno de LibVLC. Se usa BeginInvoke
@@ -1627,9 +1507,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleReferenceWindow()
     {
-        // Requiere el render por callbacks (imagen WPF): con el video en la ventana nativa de LibVLC
-        // no habria nada que mostrar aca, y ademas no obedeceria la transparencia.
-        if (!IsAnimatorModeEnabled || !IsCallbackRenderingActive)
+        // Herramienta del modo animador (opacidad, siempre encima, click-through).
+        if (!IsAnimatorModeEnabled)
             return;
 
         if (_referenceWindow is not null)

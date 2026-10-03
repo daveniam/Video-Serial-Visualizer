@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>VideoSerialVisualizer</AssemblyName>
     <RootNamespace>VideoSerialVisualizer</RootNamespace>
     <Platforms>x64</Platforms>
@@ -58,14 +57,6 @@
     <VlcWindowsX64Enabled>true</VlcWindowsX64Enabled>
     <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
   </PropertyGroup>
-
-  <!-- WinForms se usa solo para hospedar la superficie de video (WindowsFormsHost + Panel).
-       Se quitan sus using implicitos para que no choquen con los tipos WPF (UserControl,
-       Application, KeyEventArgs, RadioButton, etc.); se referencian con nombre calificado. -->
-  <ItemGroup>
-    <Using Remove="System.Windows.Forms" />
-    <Using Remove="System.Drawing" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />

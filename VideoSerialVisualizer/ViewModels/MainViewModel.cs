@@ -131,9 +131,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (PlayerViewModel is null)
             return;
 
-        // Mostrar primero el reproductor para que PlayerView se cargue y registre su ventana de
-        // video (Hwnd). Se espera a la prioridad Loaded del Dispatcher para garantizar que ese
-        // registro ya ocurrio ANTES de reproducir; de lo contrario LibVLC abre su propia ventana.
+        // Mostrar primero el reproductor y esperar a que PlayerView termine de cargarse (prioridad
+        // Loaded) antes de reproducir, asi el primer cuadro ya tiene donde mostrarse.
         CurrentViewModel = PlayerViewModel;
         await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
         await PlayerViewModel!.LoadVideoAsync(video, LibraryViewModel!.GetPlaylist());
