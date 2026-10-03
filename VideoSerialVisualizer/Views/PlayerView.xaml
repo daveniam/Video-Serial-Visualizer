@@ -69,18 +69,23 @@
                1. Ventana nativa de LibVLC: el camino rapido, con el modo animador apagado.
                2. Imagen WPF en vivo (render por callbacks): en modo animador, para que el video sea
                   contenido WPF y pueda transparentarse / llevarse a la ventana flotante.
-               3. Imagen WPF del cuadro exacto de FFmpeg: mientras se revisa cuadro a cuadro. -->
-        <Grid Grid.Row="1" x:Name="VideoArea" Background="Black">
+               3. Imagen WPF del cuadro exacto de FFmpeg: mientras se revisa cuadro a cuadro.
+             EXPERIMENTAL (rama experimental/d3dimage): con Direct3D 9Ex disponible, la 2 (via
+             D3DImage) se usa SIEMPRE, tambien con el modo animador apagado; la 1 queda solo como
+             respaldo si D3D no arranca o con VSV_RENDERER=bitmap. -->
+
+        <!-- El clic va en el contenedor (y no en cada Image) para que tambien funcione sobre las bandas
+             negras, como pasaba con la superficie nativa. -->
+        <Grid Grid.Row="1" x:Name="VideoArea" Background="Black"
+              MouseLeftButtonDown="VideoArea_MouseLeftButtonDown">
             <wfi:WindowsFormsHost x:Name="VideoHost" Background="Black"
                                    Visibility="{Binding ShowNativeVideoSurface, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <Image Source="{Binding VideoFrame}" Stretch="Uniform"
-                   Visibility="{Binding IsCallbackVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                   MouseLeftButtonDown="FrameStepImage_MouseLeftButtonDown" />
+                   Visibility="{Binding IsCallbackVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <Image Source="{Binding FrameStepImage}" Stretch="Uniform"
-                   Visibility="{Binding IsFrameStepVisibleInMain, Converter={StaticResource BooleanToVisibilityConverter}}"
-                   MouseLeftButtonDown="FrameStepImage_MouseLeftButtonDown" />
+                   Visibility="{Binding IsFrameStepVisibleInMain, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. -->
             <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="6,3"

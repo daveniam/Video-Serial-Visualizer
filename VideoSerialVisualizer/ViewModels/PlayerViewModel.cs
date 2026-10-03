@@ -832,6 +832,9 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         _media?.Dispose();
         _media = new Media(_libVlc, new Uri(video.RutaAbsoluta));
 
+        _videoColor = null;
+        _colorProbeGeneration++;
+
         if (IsAnimatorModeEnabled)
         {
             // En modo animador el sondeo con FFmpeg se hace ANTES de reproducir y se espera: hace
@@ -848,17 +851,108 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             });
             NotifyFrameTickPropertiesChanged();
             NotifyFrameStepAvailabilityChanged();
+        }
 
-            AttachFrameRenderer();
-        }
-        else
-        {
-            DetachFrameRenderer();
-        }
+        ConfigureVideoOutput(video.RutaAbsoluta);
 
         MediaPlayer.Play(_media);
         MediaPlayer.Volume = Volume;
         _saveTimer.Start();
+    }
+
+    /// <summary>
+    /// EXPERIMENTAL (rama experimental/d3dimage): decide como se dibuja el video antes de cada Play.
+    /// Con Direct3D 9Ex disponible, SIEMPRE por D3DImage (reproduccion normal y modo animador): el
+    /// video pasa a ser contenido WPF y la ventana nativa del WindowsFormsHost queda sin uso. Si no
+    /// esta disponible, el comportamiento de siempre: ventana nativa, o WriteableBitmap en modo
+    /// animador. VSV_RENDERER=bitmap fuerza el comportamiento de siempre para comparar.
+    /// </summary>
+    private void ConfigureVideoOutput(string path)
+    {
+        if (EnsureD3DRenderer() is { } d3d)
+        {
+            // Mismo orden que AttachFrameRenderer: el Hwnd se limpia ANTES de registrar callbacks.
+            MediaPlayer.Hwnd = IntPtr.Zero;
+            d3d.Attach(MediaPlayer, _media, _videoColor);
+            VideoFrame = d3d.Frame;
+            IsCallbackRenderingActive = true;
+
+            // Fuera del modo animador no se abrio el archivo con FFmpeg: el video arranca con la
+            // matriz de color por convencion y se corrige al terminar el sondeo (unos ms despues).
+            if (_videoColor is null)
+                ProbeColorInBackground(path, d3d);
+            return;
+        }
+
+        if (IsAnimatorModeEnabled)
+            AttachFrameRenderer();
+        else
+            DetachFrameRenderer();
+    }
+
+    /// <summary>D3D no se pudo inicializar en esta sesion: no se reintenta en cada video.</summary>
+    private bool _d3dUnavailable;
+
+    /// <summary>Descarta sondeos de color de un video anterior que terminan tarde.</summary>
+    private int _colorProbeGeneration;
+
+    /// <summary>
+    /// El renderer D3D vive mientras viva el reproductor (se reutiliza entre videos: los recursos de
+    /// GPU se recrean solos cuando cambia el tamano). Null si no esta disponible o esta forzado el
+    /// render de siempre.
+    /// </summary>
+    private D3DImageVlcRenderer? EnsureD3DRenderer()
+    {
+        if (_frameRenderer is D3DImageVlcRenderer existing)
+            return existing;
+
+        var forced = Environment.GetEnvironmentVariable("VSV_RENDERER")?.Trim().ToLowerInvariant();
+        if (_d3dUnavailable || forced == "bitmap")
+            return null;
+
+        var d3d = D3DImageVlcRenderer.TryCreate(App.Current.Dispatcher, preferI420: forced != "d3d-bgra");
+        if (d3d is null)
+        {
+            _d3dUnavailable = true;
+            return null;
+        }
+
+        // Si habia otro renderer (no deberia: la eleccion no cambia en la sesion), se descarta.
+        DetachFrameRenderer();
+
+        _frameRenderer = d3d;
+        d3d.StatsUpdated += OnRendererStatsUpdated;
+        return d3d;
+    }
+
+    /// <summary>
+    /// Lee el espacio de color con FFmpeg en segundo plano y se lo pasa al renderer. Carga FFmpeg
+    /// tambien fuera del modo animador (costo: unos MB de DLLs mapeadas; aceptable en el experimento).
+    /// </summary>
+    private void ProbeColorInBackground(string path, D3DImageVlcRenderer d3d)
+    {
+        var generation = _colorProbeGeneration;
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                EnsureFFmpegPathConfigured();
+                FFmpegLoader.LoadFFmpeg(); // no hace nada si ya estaba cargado
+                return VideoColorInfo.TryProbe(path);
+            }
+            catch
+            {
+                return null;
+            }
+        }).ContinueWith(task =>
+        {
+            if (task.Result is not { } color || generation != _colorProbeGeneration || _frameRenderer != d3d)
+                return;
+
+            _videoColor = color;
+            d3d.UpdateColorInfo(color);
+        }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 
     /// <summary>
@@ -894,23 +988,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         IsCallbackRenderingActive = true;
     }
 
-    /// <summary>
-    /// EXPERIMENTAL (rama experimental/d3dimage): por defecto se prueba el render con D3DImage y
-    /// conversion YUV->RGB por shader (I420); si no se puede, D3DImage con BGRA, y si Direct3D 9Ex no
-    /// esta disponible, el WriteableBitmap de siempre. Para comparar con el mismo video, la variable
-    /// de entorno VSV_RENDERER fuerza uno: "bitmap" (WriteableBitmap) o "d3d-bgra".
-    /// </summary>
-    private static IVlcFrameRenderer CreateFrameRenderer()
-    {
-        var dispatcher = App.Current.Dispatcher;
-        var forced = Environment.GetEnvironmentVariable("VSV_RENDERER")?.Trim().ToLowerInvariant();
-
-        if (forced != "bitmap"
-            && D3DImageVlcRenderer.TryCreate(dispatcher, preferI420: forced != "d3d-bgra") is { } d3d)
-            return d3d;
-
-        return new VlcFrameRenderer(dispatcher);
-    }
+    /// <summary>Respaldo cuando D3D no esta disponible (ver <see cref="ConfigureVideoOutput"/>).</summary>
+    private static IVlcFrameRenderer CreateFrameRenderer() => new VlcFrameRenderer(App.Current.Dispatcher);
 
     private void OnRendererStatsUpdated(RendererStats stats) => RendererStatsText = stats.ToString();
 

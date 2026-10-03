@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using LibVLCSharp.Shared;
 using Vortice.Direct3D9;
 using Vortice.Mathematics;
 
@@ -21,22 +22,26 @@ using VlcMediaPlayer = LibVLCSharp.Shared.MediaPlayer;
 namespace VideoSerialVisualizer.Helpers;
 
 /// <summary>
-/// EXPERIMENTAL (rama experimental/d3dimage). Mismo contrato que <see cref="VlcFrameRenderer"/>,
-/// pero el cuadro termina en una textura Direct3D 9Ex que WPF compone directo via
-/// <see cref="D3DImage"/>, en vez de en un WriteableBitmap.
+/// EXPERIMENTAL (rama experimental/d3dimage). Muestra el video de LibVLC como contenido WPF a traves
+/// de una textura Direct3D 9Ex que WPF compone directo via <see cref="D3DImage"/>. Reemplaza tanto a
+/// la ventana nativa (reproduccion normal) como al WriteableBitmap (modo animador).
 ///
 /// Dos modos:
 ///   * I420 (el normal): VLC entrega los tres planos Y, U, V tal como salen del decodificador
-///     (H.264/H.265 de 8 bits ya vienen asi), sin convertir nada. Se suben como tres texturas de un
-///     canal y un pixel shader hace la conversion YUV->RGB en la GPU al dibujar. Sale de la CPU el
-///     paso mas caro (con BGRA, VLC convierte cada pixel por software) y la copia es ~2.7x menor
-///     (1.5 bytes por pixel en vez de 4).
+///     (H.264/H.265 de 8 bits ya vienen asi), sin convertir ni escalar nada. Se suben como tres
+///     texturas de un canal y un pixel shader hace la conversion YUV->RGB en la GPU al dibujar.
 ///   * BGRA (respaldo): si el shader no se puede compilar/crear. VLC convierte por CPU y el cuadro
 ///     se copia tal cual a la textura.
 ///
-/// En ambos, el trabajo con la GPU lo hace el hilo de video de VLC y se dibuja en la textura "de
-/// atras" de un doble buffer; el hilo de UI solo le indica a D3DImage cual mostrar (casi gratis).
-/// VLC nunca escribe la textura que WPF esta leyendo.
+/// El tamano lo informa VLC en el callback de formato al arrancar cada video, asi que no hace falta
+/// conocerlo de antemano. Ojo: VLC ofrece el tamano CODIFICADO (1920x1088 para un 1080p, porque el
+/// decodificador trabaja en bloques de 16), no el visible. Se acepta ese buffer tal cual (pedir otro
+/// tamano obligaria a VLC a meter un escalador por CPU) y el shader recorta las filas/columnas de
+/// relleno y aplica la relacion de aspecto de pixel (videos anamorficos) al dibujar, gratis.
+///
+/// El trabajo con la GPU lo hace el hilo de video de VLC y se dibuja en la textura "de atras" de un
+/// doble buffer; el hilo de UI solo le indica a D3DImage cual mostrar (casi gratis). VLC nunca
+/// escribe la textura que WPF esta leyendo.
 ///
 /// Limitacion de VLC 3: entrega los cuadros en memoria de CPU, asi que la subida CPU->GPU sigue
 /// existiendo (VLC 4 permitiria dibujar directo en una textura, pero esta en preview).
@@ -50,7 +55,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
     /// <summary>
     /// Conversion YUV->RGB. Cada plano llega en una textura L8 (un canal, 0..1). Las constantes
-    /// (rango limitado y matriz BT.601/BT.709) se cargan desde C#, ver <see cref="SetColorMatrix"/>.
+    /// (rango y matriz de color) se cargan desde C#, ver <see cref="VideoColorInfo.ToShaderConstants"/>.
     /// </summary>
     private const string YuvToRgbShader = """
         sampler2D texY : register(s0);
@@ -72,7 +77,8 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     private readonly PixelMode _mode;
     private readonly RendererStatsCounter _stats;
 
-    /// <summary>Protege los recursos D3D: el hilo de VLC los usa en Display y el de UI los libera.</summary>
+    /// <summary>Protege los recursos D3D y el tamano: los usan el hilo de VLC (formato, display) y
+    /// el de UI (mostrar, liberar).</summary>
     private readonly object _sync = new();
 
     private IDirect3D9Ex? _d3d;
@@ -80,7 +86,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     private IDirect3DQuery9? _flushQuery;
     private IDirect3DPixelShader9? _yuvShader;
 
-    // Destino doble buffer (lo que se le da a D3DImage).
+    // Destino doble buffer (lo que se le da a D3DImage), al tamano de visualizacion.
     private readonly IDirect3DTexture9?[] _targets = new IDirect3DTexture9?[2];
     private readonly IDirect3DSurface9?[] _targetSurfaces = new IDirect3DSurface9?[2];
 
@@ -92,6 +98,14 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
     // Modo BGRA: superficie en memoria de sistema desde la que se copia a la GPU.
     private IDirect3DSurface9? _staging;
+
+    /// <summary>
+    /// Recursos de un tamano anterior que todavia no se pueden liberar: WPF puede seguir mostrando
+    /// el destino viejo hasta que el hilo de UI le pase el nuevo. Se liberan ahi (ver
+    /// <see cref="OnResourcesRecreated"/>).
+    /// </summary>
+    private readonly List<IDisposable> _retired = new();
+    private readonly List<IntPtr> _retiredBuffers = new();
 
     private D3DImage? _image;
 
@@ -108,8 +122,27 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     private readonly int[] _pitches = new int[3];
     private readonly int[] _planeWidths = new int[3];
     private readonly int[] _planeHeights = new int[3];
-    private int _width;
-    private int _height;
+
+    /// <summary>Tamano del buffer que entrega VLC (puede incluir relleno, p.ej. 1088 filas).</summary>
+    private int _bufferWidth;
+    private int _bufferHeight;
+
+    /// <summary>Parte visible del buffer (sin el relleno del decodificador).</summary>
+    private int _visibleWidth;
+    private int _visibleHeight;
+
+    /// <summary>Tamano del destino = visible con la relacion de aspecto de pixel ya aplicada.</summary>
+    private int _targetWidth;
+    private int _targetHeight;
+
+    /// <summary>Media actual: de su pista de video salen el tamano visible y el aspecto de pixel.</summary>
+    private Media? _media;
+
+    /// <summary>Tamano visible conocido de antemano (sondeo con FFmpeg), si no hay pista todavia.</summary>
+    private (int Width, int Height) _visibleHint;
+
+    private VideoColorInfo _color;
+    private bool _colorDirty;
 
     /// <summary>1 mientras la UI no termino de mostrar el ultimo cuadro: si VLC entrega mas rapido,
     /// se descarta en vez de encolar.</summary>
@@ -123,18 +156,29 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
     public event Action<RendererStats>? StatsUpdated;
 
+    /// <summary>Se dispara (en el hilo de UI) cuando cambia el tamano de visualizacion del video.</summary>
+    public event Action<int, int>? VideoSizeChanged;
+
     private D3DImageVlcRenderer(Dispatcher dispatcher, PixelMode mode)
     {
         _dispatcher = dispatcher;
         _mode = mode;
         Name = mode == PixelMode.I420 ? "D3DImage I420" : "D3DImage BGRA";
         _stats = new RendererStatsCounter(Name);
+
+        // D3DImage tiene afinidad con el hilo de UI: se crea ya, asi Frame existe desde el principio
+        // y la vista puede enlazarlo antes de que llegue el primer cuadro.
+        _dispatcher.Invoke(() =>
+        {
+            _image = new D3DImage();
+            _image.IsFrontBufferAvailableChanged += OnFrontBufferAvailableChanged;
+        });
     }
 
     /// <summary>
     /// Crea el renderer o devuelve null si Direct3D 9Ex no esta disponible (sin GPU, escritorio
-    /// remoto viejo, driver roto...); quien lo llama cae al WriteableBitmap. Con
-    /// <paramref name="preferI420"/> intenta el modo shader y, si no puede, se queda en BGRA.
+    /// remoto viejo, driver roto...). Con <paramref name="preferI420"/> intenta el modo shader y, si
+    /// no puede, se queda en BGRA.
     /// </summary>
     public static D3DImageVlcRenderer? TryCreate(Dispatcher dispatcher, bool preferI420 = true)
     {
@@ -218,8 +262,9 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
         for (var i = 0; i < 3; i++)
         {
-            // Lineal: U y V tienen la mitad de resolucion y se interpolan al tamano de Y. Clamp
-            // para que el borde no "envuelva" y tome color del lado opuesto.
+            // Lineal: U y V tienen la mitad de resolucion y se interpolan al tamano de Y; ademas
+            // suaviza el estirado horizontal de los videos anamorficos. Clamp para que el borde no
+            // "envuelva" y tome color del lado opuesto.
             _device.SetSamplerState(i, SamplerState.MinFilter, (int)TextureFilter.Linear);
             _device.SetSamplerState(i, SamplerState.MagFilter, (int)TextureFilter.Linear);
             _device.SetSamplerState(i, SamplerState.AddressU, (int)TextureAddress.Clamp);
@@ -230,56 +275,36 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         _device.VertexFormat = VertexFormat.PositionRhw | VertexFormat.Texture1;
     }
 
-    /// <summary>Carga en el shader los coeficientes de la conversion (ver <see cref="VideoColorInfo"/>).</summary>
-    private void SetColorMatrix(VideoColorInfo color, int height)
-    {
-        _device!.SetPixelShaderConstant(0, color.ToShaderConstants(height));
-    }
-
+    /// <summary>Contrato comun: tamano conocido de antemano (sondeo con FFmpeg). Aca es solo una
+    /// pista por si la pista de video todavia no esta disponible al arrancar.</summary>
     public void Attach(VlcMediaPlayer mediaPlayer, uint width, uint height, VideoColorInfo? color = null)
     {
-        if (_isDisposed || _device is null || width == 0 || height == 0)
+        _visibleHint = ((int)width, (int)height);
+        Attach(mediaPlayer, null, color);
+    }
+
+    /// <summary>
+    /// Conecta el renderer al MediaPlayer. Se llama antes de cada Play, con el Hwnd ya limpio (en
+    /// LibVLC el Hwnd y los callbacks son excluyentes y gana lo ultimo que se configura). Los
+    /// recursos de GPU se crean despues, cuando VLC informa el formato del video.
+    /// </summary>
+    /// <param name="media">Media que se va a reproducir; de su pista sale el tamano visible.</param>
+    /// <param name="color">Espacio de color si ya se conoce; si no, se usa la convencion y se puede
+    /// corregir despues con <see cref="UpdateColorInfo"/>.</param>
+    public void Attach(VlcMediaPlayer mediaPlayer, Media? media, VideoColorInfo? color)
+    {
+        if (_isDisposed || _device is null)
             return;
 
         lock (_sync)
         {
-            ReleaseFrameResources();
-
-            _width = (int)width;
-            _height = (int)height;
-
-            for (var i = 0; i < 2; i++)
-            {
-                // El handle compartido es lo que permite a WPF (que tiene su PROPIO dispositivo D3D)
-                // abrir la textura directo, sin copiarla otra vez.
-                var shared = IntPtr.Zero;
-                _targets[i] = _device.CreateTexture(width, height, 1, Usage.RenderTarget, TargetFormat,
-                    Pool.Default, ref shared);
-                _targetSurfaces[i] = _targets[i]!.GetSurfaceLevel(0);
-            }
-
-            if (_mode == PixelMode.I420)
-                CreateI420Resources(color ?? default);
-            else
-                CreateBgraResources();
-
-            _backIndex = 0;
-            Interlocked.Exchange(ref _pendingPaint, 0);
+            _media = media;
+            _color = color ?? default;
+            _colorDirty = true;
         }
 
-        // D3DImage tiene afinidad con el hilo de UI.
-        _dispatcher.Invoke(() =>
-        {
-            if (_image is null)
-            {
-                _image = new D3DImage();
-                _image.IsFrontBufferAvailableChanged += OnFrontBufferAvailableChanged;
-            }
-
-            // Se arranca mostrando el destino 1 (vacio) para que el Image ya tenga tamano; el primer
-            // cuadro se dibuja en el 0.
-            SetBackBuffer(1);
-        });
+        _formatCb = OnVideoFormat;
+        _cleanupCb = (ref IntPtr _) => { };
 
         _lockCb = (_, planes) =>
         {
@@ -294,88 +319,282 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
         _displayCb = (_, _) => OnFrameDecoded();
 
-        if (_mode == PixelMode.I420)
-        {
-            _formatCb = OnVideoFormat;
-            _cleanupCb = (ref IntPtr _) => { };
-            mediaPlayer.SetVideoFormatCallbacks(_formatCb, _cleanupCb);
-        }
-        else
-        {
-            mediaPlayer.SetVideoFormat("BGRA", width, height, (uint)_pitches[0]);
-        }
-
+        mediaPlayer.SetVideoFormatCallbacks(_formatCb, _cleanupCb);
         mediaPlayer.SetVideoCallbacks(_lockCb, _unlockCb, _displayCb);
     }
 
-    private void CreateI420Resources(VideoColorInfo color)
+    /// <summary>
+    /// Corrige el espacio de color con el video ya andando (el sondeo con FFmpeg termina despues de
+    /// arrancar en la reproduccion normal). Se aplica en el proximo cuadro.
+    /// </summary>
+    public void UpdateColorInfo(VideoColorInfo color)
     {
-        var chromaWidth = (_width + 1) / 2;
-        var chromaHeight = (_height + 1) / 2;
-
-        _planeWidths[0] = _width;
-        _planeHeights[0] = _height;
-        _planeWidths[1] = _planeWidths[2] = chromaWidth;
-        _planeHeights[1] = _planeHeights[2] = chromaHeight;
-
-        // Pitch alineado a 32 bytes: VLC lo prefiere para sus copias vectorizadas (SIMD).
-        long total = 0;
-        for (var i = 0; i < 3; i++)
+        lock (_sync)
         {
-            _pitches[i] = Align(_planeWidths[i], 32);
-            total += (long)_pitches[i] * _planeHeights[i];
+            _color = color;
+            _colorDirty = true;
         }
-
-        _buffer = Marshal.AllocHGlobal((IntPtr)total);
-        var offset = 0L;
-        for (var i = 0; i < 3; i++)
-        {
-            _planes[i] = _buffer + (nint)offset;
-            offset += (long)_pitches[i] * _planeHeights[i];
-
-            // Dynamic: textura que la CPU reescribe en cada cuadro (LockRect con Discard).
-            _planeTextures[i] = _device!.CreateTexture((uint)_planeWidths[i], (uint)_planeHeights[i], 1,
-                Usage.Dynamic, Format.L8, Pool.Default);
-        }
-
-        SetColorMatrix(color, _height);
-
-        // Se ve en el cartel: que conversion se esta aplicando a ESTE video.
-        Name = _stats.Name = $"D3DImage I420 {color.Describe(_height)}";
-    }
-
-    private void CreateBgraResources()
-    {
-        _pitches[0] = _width * 4;
-        _planeWidths[0] = _width;
-        _planeHeights[0] = _height;
-        _buffer = Marshal.AllocHGlobal(_pitches[0] * _height);
-        _planes[0] = _buffer;
-
-        _staging = _device!.CreateOffscreenPlainSurface((uint)_width, (uint)_height, TargetFormat, Pool.SystemMemory);
     }
 
     /// <summary>
-    /// Hilo de VLC, al arrancar el video: se le pide I420 al tamano fijado en Attach (si el video es
-    /// de otro tamano, VLC lo escala). Devuelve la cantidad de buffers de imagen (1).
+    /// Hilo de VLC, al arrancar cada video: VLC propone formato y tamano; aca se fija el formato que
+    /// se quiere recibir y se crean (o reutilizan) los recursos de GPU. Devuelve la cantidad de
+    /// buffers de imagen (1), o 0 para abortar el video.
     /// </summary>
     private uint OnVideoFormat(ref IntPtr opaque, IntPtr chroma, ref uint width, ref uint height,
         ref uint pitches, ref uint lines)
     {
-        // chroma es un char[4] (FourCC) que VLC deja leer y escribir.
-        Marshal.Copy("I420"u8.ToArray(), 0, chroma, 4);
-        width = (uint)_width;
-        height = (uint)_height;
-
-        // pitches y lines son arreglos nativos (uno por plano); LibVLCSharp los expone como ref al
-        // primer elemento.
-        for (var i = 0; i < 3; i++)
+        try
         {
-            Unsafe.Add(ref pitches, i) = (uint)_pitches[i];
-            Unsafe.Add(ref lines, i) = (uint)_planeHeights[i];
+            var (visibleWidth, visibleHeight, sar) = ResolveVisibleSize((int)width, (int)height);
+            bool recreated;
+
+            lock (_sync)
+            {
+                if (_isDisposed || _device is null)
+                    return 0;
+
+                int bufferWidth, bufferHeight;
+                if (_mode == PixelMode.I420)
+                {
+                    // Se acepta el buffer tal cual lo ofrece VLC: cualquier otro tamano implicaria
+                    // escalar por CPU. El recorte y el aspecto los resuelve el shader.
+                    bufferWidth = (int)width;
+                    bufferHeight = (int)height;
+                    _targetWidth = Math.Max(1, (int)Math.Round(visibleWidth * sar));
+                    _targetHeight = visibleHeight;
+                }
+                else
+                {
+                    // En BGRA VLC convierte por CPU de todas formas: se le pide directamente el tamano
+                    // final (visible y con el aspecto aplicado) y el destino recibe una copia exacta.
+                    bufferWidth = _targetWidth = Math.Max(1, (int)Math.Round(visibleWidth * sar));
+                    bufferHeight = _targetHeight = visibleHeight;
+                    visibleWidth = bufferWidth;
+                    visibleHeight = bufferHeight;
+                }
+
+                recreated = bufferWidth != _bufferWidth || bufferHeight != _bufferHeight
+                    || visibleWidth != _visibleWidth || visibleHeight != _visibleHeight
+                    || _targets[0] is null || TargetSizeChanged();
+
+                if (recreated)
+                {
+                    RetireFrameResources();
+                    _bufferWidth = bufferWidth;
+                    _bufferHeight = bufferHeight;
+                    _visibleWidth = visibleWidth;
+                    _visibleHeight = visibleHeight;
+                    CreateFrameResources();
+                }
+
+                Marshal.Copy(_mode == PixelMode.I420 ? "I420"u8.ToArray() : "BGRA"u8.ToArray(), 0, chroma, 4);
+                width = (uint)_bufferWidth;
+                height = (uint)_bufferHeight;
+
+                // pitches y lines son arreglos nativos (uno por plano); LibVLCSharp los expone como
+                // ref al primer elemento.
+                var planeCount = _mode == PixelMode.I420 ? 3 : 1;
+                for (var i = 0; i < planeCount; i++)
+                {
+                    Unsafe.Add(ref pitches, i) = (uint)_pitches[i];
+                    Unsafe.Add(ref lines, i) = (uint)_planeHeights[i];
+                }
+
+                _colorDirty = true;
+                Interlocked.Exchange(ref _pendingPaint, 0);
+            }
+
+            if (recreated)
+                _dispatcher.BeginInvoke(OnResourcesRecreated);
+
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[D3DImage] Fallo al configurar el formato: {ex}");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Tamano visible y relacion de aspecto de pixel. Salen de la pista de video de la media (VLC
+    /// ya la conoce cuando llama al callback de formato); si no esta, de la pista previa (sondeo) y,
+    /// en ultimo caso, se toma el buffer entero.
+    /// </summary>
+    private (int Width, int Height, double Sar) ResolveVisibleSize(int bufferWidth, int bufferHeight)
+    {
+        int width = 0, height = 0;
+        double sar = 1;
+
+        try
+        {
+            // Media.Tracks solo toma el lock del item, no el del reproductor: es seguro llamarlo
+            // desde el hilo de video (MediaPlayer.Media/Size podrian bloquearse contra un Play/Stop
+            // en curso en el hilo de UI).
+            foreach (var track in _media?.Tracks ?? [])
+            {
+                if (track.TrackType != TrackType.Video)
+                    continue;
+
+                width = (int)track.Data.Video.Width;
+                height = (int)track.Data.Video.Height;
+                if (track.Data.Video.SarNum > 0 && track.Data.Video.SarDen > 0)
+                    sar = (double)track.Data.Video.SarNum / track.Data.Video.SarDen;
+                break;
+            }
+        }
+        catch
+        {
+            // sin pista: se cae a la pista previa o al buffer
         }
 
-        return 1;
+        if (width <= 0 || height <= 0)
+            (width, height) = _visibleHint;
+
+        // Nunca mas grande que el buffer (eso indicaria una pista de otro video o datos raros).
+        if (width <= 0 || height <= 0 || width > bufferWidth || height > bufferHeight)
+            (width, height) = (bufferWidth, bufferHeight);
+
+        // Aspecto absurdo (metadatos rotos): mejor cuadrado que una imagen aplastada.
+        if (sar is < 0.25 or > 4)
+            sar = 1;
+
+        return (width, height, sar);
+    }
+
+    private bool TargetSizeChanged()
+    {
+        var surface = _targetSurfaces[0];
+        if (surface is null)
+            return true;
+
+        var desc = surface.Description;
+        return desc.Width != _targetWidth || desc.Height != _targetHeight;
+    }
+
+    /// <summary>Con <see cref="_sync"/> tomado. Crea destinos, buffers y texturas al tamano actual.</summary>
+    private void CreateFrameResources()
+    {
+        for (var i = 0; i < 2; i++)
+        {
+            // El handle compartido es lo que permite a WPF (que tiene su PROPIO dispositivo D3D)
+            // abrir la textura directo, sin copiarla otra vez.
+            var shared = IntPtr.Zero;
+            _targets[i] = _device!.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
+                TargetFormat, Pool.Default, ref shared);
+            _targetSurfaces[i] = _targets[i]!.GetSurfaceLevel(0);
+
+            // La memoria de una textura nueva no viene inicializada: sin esto, el destino que se
+            // muestra hasta el primer cuadro podria verse con basura en vez de negro.
+            _device.SetRenderTarget(0, _targetSurfaces[i]!);
+            _device.Clear(ClearFlags.Target, new Vortice.Mathematics.Color(0, 0, 0, 255), 1f, 0);
+        }
+
+        if (_mode == PixelMode.I420)
+        {
+            _planeWidths[0] = _bufferWidth;
+            _planeHeights[0] = _bufferHeight;
+            _planeWidths[1] = _planeWidths[2] = (_bufferWidth + 1) / 2;
+            _planeHeights[1] = _planeHeights[2] = (_bufferHeight + 1) / 2;
+
+            // Pitch alineado a 32 bytes: VLC lo prefiere para sus copias vectorizadas (SIMD).
+            long total = 0;
+            for (var i = 0; i < 3; i++)
+            {
+                _pitches[i] = Align(_planeWidths[i], 32);
+                total += (long)_pitches[i] * _planeHeights[i];
+            }
+
+            _buffer = Marshal.AllocHGlobal((IntPtr)total);
+            var offset = 0L;
+            for (var i = 0; i < 3; i++)
+            {
+                _planes[i] = _buffer + (nint)offset;
+                offset += (long)_pitches[i] * _planeHeights[i];
+
+                // Dynamic: textura que la CPU reescribe en cada cuadro (LockRect con Discard).
+                _planeTextures[i] = _device.CreateTexture((uint)_planeWidths[i], (uint)_planeHeights[i], 1,
+                    Usage.Dynamic, Format.L8, Pool.Default);
+            }
+        }
+        else
+        {
+            _pitches[0] = _bufferWidth * 4;
+            _planeWidths[0] = _bufferWidth;
+            _planeHeights[0] = _bufferHeight;
+            _buffer = Marshal.AllocHGlobal(_pitches[0] * _bufferHeight);
+            _planes[0] = _buffer;
+
+            _staging = _device.CreateOffscreenPlainSurface((uint)_bufferWidth, (uint)_bufferHeight, TargetFormat,
+                Pool.SystemMemory);
+        }
+
+        _backIndex = 0;
+    }
+
+    /// <summary>
+    /// Con <see cref="_sync"/> tomado. Saca de uso los recursos actuales sin liberarlos todavia: el
+    /// destino viejo puede seguir siendo el back buffer de D3DImage hasta que la UI cambie al nuevo.
+    /// </summary>
+    private void RetireFrameResources()
+    {
+        for (var i = 0; i < 2; i++)
+        {
+            if (_targetSurfaces[i] is { } surface)
+                _retired.Add(surface);
+            if (_targets[i] is { } target)
+                _retired.Add(target);
+            _targetSurfaces[i] = null;
+            _targets[i] = null;
+        }
+
+        for (var i = 0; i < 3; i++)
+        {
+            if (_planeTextures[i] is { } plane)
+                _retired.Add(plane);
+            _planeTextures[i] = null;
+            _planes[i] = IntPtr.Zero;
+        }
+
+        if (_staging is not null)
+            _retired.Add(_staging);
+        _staging = null;
+
+        if (_buffer != IntPtr.Zero)
+            _retiredBuffers.Add(_buffer);
+        _buffer = IntPtr.Zero;
+    }
+
+    /// <summary>Con <see cref="_sync"/> tomado. Libera lo retirado.</summary>
+    private void FreeRetired()
+    {
+        foreach (var resource in _retired)
+            resource.Dispose();
+        _retired.Clear();
+
+        foreach (var buffer in _retiredBuffers)
+            Marshal.FreeHGlobal(buffer);
+        _retiredBuffers.Clear();
+    }
+
+    /// <summary>Hilo de UI, tras recrear recursos: D3DImage pasa al destino nuevo (vacio, negro hasta
+    /// el primer cuadro) y recien ahi se libera el viejo.</summary>
+    private void OnResourcesRecreated()
+    {
+        int width, height;
+        lock (_sync)
+        {
+            if (_isDisposed)
+                return;
+
+            SetBackBuffer(1 - _backIndex);
+            FreeRetired();
+            width = _targetWidth;
+            height = _targetHeight;
+        }
+
+        VideoSizeChanged?.Invoke(width, height);
     }
 
     /// <summary>Hilo de VLC: dibuja el cuadro en el destino de atras y le pide a la UI que lo muestre.</summary>
@@ -457,6 +676,16 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// <summary>Sube los tres planos y dibuja un rectangulo a pantalla completa con el shader.</summary>
     private unsafe void DrawI420(IDirect3DSurface9 target)
     {
+        var device = _device!;
+
+        if (_colorDirty)
+        {
+            device.SetPixelShaderConstant(0, _color.ToShaderConstants(_visibleHeight));
+            // Se ve en el cartel: que conversion se esta aplicando a ESTE video.
+            Name = _stats.Name = $"D3DImage I420 {_color.Describe(_visibleHeight)}";
+            _colorDirty = false;
+        }
+
         for (var i = 0; i < 3; i++)
         {
             var texture = _planeTextures[i]!;
@@ -472,20 +701,23 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             }
         }
 
-        var device = _device!;
         device.SetRenderTarget(0, target);
         for (var i = 0; i < 3; i++)
             device.SetTexture(i, _planeTextures[i]!);
 
         // Vertices ya transformados (x, y, z, rhw, u, v). El -0.5 alinea texeles con pixeles: en
-        // D3D9 el centro del pixel esta en coordenadas enteras, no en .5.
-        float l = -0.5f, t = -0.5f, r = _width - 0.5f, b = _height - 0.5f;
+        // D3D9 el centro del pixel esta en coordenadas enteras, no en .5. Las coordenadas de textura
+        // llegan solo hasta la parte visible: asi se recorta el relleno del decodificador (y si el
+        // destino es mas ancho por el aspecto de pixel, la misma imagen se estira para llenarlo).
+        float l = -0.5f, t = -0.5f, r = _targetWidth - 0.5f, b = _targetHeight - 0.5f;
+        var maxU = (float)_visibleWidth / _bufferWidth;
+        var maxV = (float)_visibleHeight / _bufferHeight;
         var vertices = stackalloc float[]
         {
             l, t, 0, 1, 0, 0,
-            r, t, 0, 1, 1, 0,
-            l, b, 0, 1, 0, 1,
-            r, b, 0, 1, 1, 1,
+            r, t, 0, 1, maxU, 0,
+            l, b, 0, 1, 0, maxV,
+            r, b, 0, 1, maxU, maxV,
         };
 
         device.BeginScene();
@@ -505,14 +737,15 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         var locked = _staging!.LockRect(LockFlags.None);
         try
         {
-            CopyRows((byte*)_buffer, _pitches[0], (byte*)locked.DataPointer, locked.Pitch, _width * 4, _height);
+            CopyRows((byte*)_buffer, _pitches[0], (byte*)locked.DataPointer, locked.Pitch, _bufferWidth * 4,
+                _bufferHeight);
         }
         finally
         {
             _staging.UnlockRect();
         }
 
-        _device!.UpdateSurface(_staging, new D3DRect(0, 0, _width, _height), target, new Int2(0, 0));
+        _device!.UpdateSurface(_staging, new D3DRect(0, 0, _bufferWidth, _bufferHeight), target, new Int2(0, 0));
     }
 
     /// <summary>Copia fila por fila: el pitch de la textura puede ser mayor que el del buffer
@@ -570,15 +803,17 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         {
             // La API nativa acepta NULL como "sin callbacks" (ver VlcFrameRenderer.Detach). Los
             // callbacks de formato hay que limpiarlos aparte: SetVideoFormat (el que usa el
-            // WriteableBitmap) NO los pisa, y VLC seguiria pidiendo I420 a un renderer muerto.
+            // WriteableBitmap) NO los pisa, y VLC seguiria pidiendo formato a un renderer muerto.
             mediaPlayer.SetVideoCallbacks(null!, null!, null!);
-            if (_mode == PixelMode.I420)
-                mediaPlayer.SetVideoFormatCallbacks(null!, null!);
+            mediaPlayer.SetVideoFormatCallbacks(null!, null!);
         }
         catch
         {
             // best effort
         }
+
+        lock (_sync)
+            _media = null;
 
         _formatCb = null;
         _cleanupCb = null;
@@ -587,33 +822,11 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         _displayCb = null;
     }
 
-    private void ReleaseFrameResources()
-    {
-        for (var i = 0; i < 2; i++)
-        {
-            _targetSurfaces[i]?.Dispose();
-            _targetSurfaces[i] = null;
-            _targets[i]?.Dispose();
-            _targets[i] = null;
-        }
-
-        for (var i = 0; i < 3; i++)
-        {
-            _planeTextures[i]?.Dispose();
-            _planeTextures[i] = null;
-            _planes[i] = IntPtr.Zero;
-        }
-
-        _staging?.Dispose();
-        _staging = null;
-
-        if (_buffer != IntPtr.Zero)
-        {
-            Marshal.FreeHGlobal(_buffer);
-            _buffer = IntPtr.Zero;
-        }
-    }
-
+    /// <summary>
+    /// Libera todo. Debe llamarse con la reproduccion DETENIDA: VLC escribe en el buffer de imagen
+    /// fuera del lock (entre lock y display), asi que liberarlo con el video andando seria un crash
+    /// nativo.
+    /// </summary>
     public void Dispose()
     {
         if (_isDisposed)
@@ -640,7 +853,8 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
         lock (_sync)
         {
-            ReleaseFrameResources();
+            RetireFrameResources();
+            FreeRetired();
             _yuvShader?.Dispose();
             _yuvShader = null;
             _flushQuery?.Dispose();
@@ -649,6 +863,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             _device = null;
             _d3d?.Dispose();
             _d3d = null;
+            _media = null;
         }
 
         _formatCb = null;

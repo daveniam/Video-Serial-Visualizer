@@ -295,9 +295,10 @@ public partial class PlayerView : UserControl
         });
     }
 
-    // Clic sobre el cuadro congelado del modo paso a cuadro: mismo gesto que clickear el video en
-    // reproduccion normal (alternar play/pausa, que ademas sale del modo paso a cuadro).
-    private void FrameStepImage_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    // Clic sobre el video WPF (render por callbacks/D3DImage, o el cuadro congelado del paso a
+    // cuadro): mismo gesto que clickear la superficie nativa (alternar play/pausa, que ademas sale
+    // del modo paso a cuadro). La superficie nativa tiene su propio aviso (OnVideoClicked).
+    private void VideoArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is PlayerViewModel vm && vm.PlayPauseCommand.CanExecute(null))
             vm.PlayPauseCommand.Execute(null);
