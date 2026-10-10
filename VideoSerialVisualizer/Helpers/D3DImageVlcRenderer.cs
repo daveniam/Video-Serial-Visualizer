@@ -154,6 +154,16 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
     private bool _isDisposed;
 
+    /// <summary>WPF perdio el acceso a la GPU (bloqueo de sesion, Ctrl+Alt+Supr, UAC, reinicio del
+    /// driver...). Mientras dure no se dibuja ni se presenta; ver OnFrontBufferAvailableChanged.</summary>
+    private bool _frontBufferLost;
+
+    /// <summary>El dispositivo D3D fallo al dibujar o presentar; se intenta recrear (ver
+    /// ScheduleDeviceRecovery).</summary>
+    private bool _deviceBroken;
+    private long _lastRecoveryTimestamp;
+    private bool _recoveryRetryPending;
+
     // Diagnostico (DiagLog): solo se registran los primeros cuadros de cada video.
     private int _diagFrames;
     private int _diagPresented;
@@ -445,25 +455,10 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// <summary>Con <see cref="_sync"/> tomado. Crea destinos, buffers y texturas al tamano actual.</summary>
     private void CreateFrameResources()
     {
-        // El handle compartido es lo que permite a WPF (que tiene su PROPIO dispositivo D3D) abrir
-        // el back buffer directo. La textura privada no lo necesita.
-        var shared = IntPtr.Zero;
-        _sharedTexture = _device!.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
-            TargetFormat, Pool.Default, ref shared);
-        _sharedSurface = _sharedTexture.GetSurfaceLevel(0);
-
-        _renderedTexture = _device.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
-            TargetFormat, Pool.Default);
-        _renderedSurface = _renderedTexture.GetSurfaceLevel(0);
-
-        // La memoria de una textura nueva no viene inicializada: sin esto, hasta el primer cuadro
-        // podria verse basura en vez de negro.
-        foreach (var surface in new[] { _sharedSurface, _renderedSurface })
-        {
-            _device.SetRenderTarget(0, surface);
-            _device.Clear(ClearFlags.Target, new Vortice.Mathematics.Color(0, 0, 0, 255), 1f, 0);
-        }
-
+        // Memoria de CPU donde decodifica VLC. Se separa de los recursos de GPU porque tienen ciclos
+        // de vida distintos: esta solo se puede reemplazar cuando VLC renegocia el formato (VLC
+        // escribe en ella fuera de cualquier lock), mientras que los de GPU se recrean tambien al
+        // recuperar el dispositivo (ver RecoverDevice).
         if (_mode == PixelMode.I420)
         {
             _planeWidths[0] = _bufferWidth;
@@ -485,10 +480,6 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             {
                 _planes[i] = _buffer + (nint)offset;
                 offset += (long)_pitches[i] * _planeHeights[i];
-
-                // Dynamic: textura que la CPU reescribe en cada cuadro (LockRect con Discard).
-                _planeTextures[i] = _device.CreateTexture((uint)_planeWidths[i], (uint)_planeHeights[i], 1,
-                    Usage.Dynamic, Format.L8, Pool.Default);
             }
         }
         else
@@ -498,9 +489,64 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             _planeHeights[0] = _bufferHeight;
             _buffer = Marshal.AllocHGlobal(_pitches[0] * _bufferHeight);
             _planes[0] = _buffer;
+        }
 
+        CreateGpuResources();
+    }
+
+    /// <summary>Con <see cref="_sync"/> tomado. Crea las texturas de GPU para el tamano actual.</summary>
+    private void CreateGpuResources()
+    {
+        // El handle compartido es lo que permite a WPF (que tiene su PROPIO dispositivo D3D) abrir
+        // el back buffer directo. La textura privada no lo necesita.
+        var shared = IntPtr.Zero;
+        _sharedTexture = _device!.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
+            TargetFormat, Pool.Default, ref shared);
+        _sharedSurface = _sharedTexture.GetSurfaceLevel(0);
+
+        _renderedTexture = _device.CreateTexture((uint)_targetWidth, (uint)_targetHeight, 1, Usage.RenderTarget,
+            TargetFormat, Pool.Default);
+        _renderedSurface = _renderedTexture.GetSurfaceLevel(0);
+
+        // La memoria de una textura nueva no viene inicializada: sin esto, hasta el primer cuadro
+        // podria verse basura en vez de negro.
+        foreach (var surface in new[] { _sharedSurface, _renderedSurface })
+        {
+            _device.SetRenderTarget(0, surface);
+            _device.Clear(ClearFlags.Target, new Vortice.Mathematics.Color(0, 0, 0, 255), 1f, 0);
+        }
+
+        if (_mode == PixelMode.I420)
+        {
+            // Dynamic: textura que la CPU reescribe en cada cuadro (LockRect con Discard).
+            for (var i = 0; i < 3; i++)
+                _planeTextures[i] = _device.CreateTexture((uint)_planeWidths[i], (uint)_planeHeights[i], 1,
+                    Usage.Dynamic, Format.L8, Pool.Default);
+        }
+        else
+        {
             _staging = _device.CreateOffscreenPlainSurface((uint)_bufferWidth, (uint)_bufferHeight, TargetFormat,
                 Pool.SystemMemory);
+        }
+    }
+
+    /// <summary>Con <see cref="_sync"/> tomado. Libera YA las texturas de GPU (no la memoria de VLC).
+    /// Solo cuando D3DImage ya no tiene el back buffer (se le quito antes).</summary>
+    private void DisposeGpuResources()
+    {
+        foreach (var resource in new IDisposable?[] { _sharedSurface, _sharedTexture, _renderedSurface, _renderedTexture, _staging })
+            resource?.Dispose();
+
+        _sharedSurface = null;
+        _sharedTexture = null;
+        _renderedSurface = null;
+        _renderedTexture = null;
+        _staging = null;
+
+        for (var i = 0; i < 3; i++)
+        {
+            _planeTextures[i]?.Dispose();
+            _planeTextures[i] = null;
         }
     }
 
@@ -593,7 +639,8 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
 
         lock (_sync)
         {
-            if (_isDisposed || _device is null || _buffer == IntPtr.Zero || _renderedSurface is null)
+            if (_isDisposed || _device is null || _buffer == IntPtr.Zero || _renderedSurface is null
+                || _frontBufferLost || _deviceBroken)
             {
                 Interlocked.Exchange(ref _pendingPaint, 0);
                 return;
@@ -616,6 +663,8 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
                 Debug.WriteLine($"[D3DImage] Cuadro descartado: {ex.Message}");
                 DiagLog.Write($"D3D: EXCEPCION al dibujar: {ex}");
                 Interlocked.Exchange(ref _pendingPaint, 0);
+                _deviceBroken = true;
+                ScheduleDeviceRecovery();
                 return;
             }
         }
@@ -631,7 +680,7 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
                 lock (_sync)
                 {
                     if (_device is null || _renderedSurface is null || _sharedSurface is null
-                        || !_image.IsFrontBufferAvailable)
+                        || !_image.IsFrontBufferAvailable || _frontBufferLost || _deviceBroken)
                         return;
 
                     // Lock: WPF no lee el back buffer hasta el Unlock. Se copia el cuadro (GPU a
@@ -661,6 +710,9 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             {
                 Debug.WriteLine($"[D3DImage] Error al presentar: {ex.Message}");
                 DiagLog.Write($"D3D: EXCEPCION al presentar: {ex}");
+                lock (_sync)
+                    _deviceBroken = true;
+                ScheduleDeviceRecovery();
             }
             finally
             {
@@ -787,17 +839,164 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     }
 
     /// <summary>
-    /// WPF suelta el front buffer cuando pierde su dispositivo (bloqueo de pantalla, cambio de
-    /// driver, etc.). Al recuperarlo hay que volver a darle la superficie actual.
+    /// WPF pierde el acceso a la GPU al bloquear la sesion, con Ctrl+Alt+Supr, un aviso de UAC o un
+    /// reinicio del driver, y lo avisa poniendo IsFrontBufferAvailable en false (a veces varias
+    /// veces seguidas: false, true, false...). Patron documentado de D3DImage:
+    ///   * al perderla: dejar de dibujar y quitarle el back buffer;
+    ///   * al recuperarla: recrear el dispositivo y las texturas DESDE CERO y recien ahi darle el
+    ///     back buffer nuevo.
+    /// Antes se le devolvia la MISMA superficie: si en el medio el dispositivo de WPF se habia
+    /// reiniciado, WPF no podia abrirla y su hilo de render fallaba (UCEERR_RENDERTHREADFAILURE),
+    /// dejando la ventana en negro. Paso tras ~1 h de reproduccion, con un bloqueo de sesion.
     /// </summary>
     private void OnFrontBufferAvailableChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        DiagLog.Write($"D3D: IsFrontBufferAvailable cambio a {_image?.IsFrontBufferAvailable}");
-        if (_image is null || !_image.IsFrontBufferAvailable)
+        if (_image is null || _isDisposed)
             return;
 
+        DiagLog.Write($"D3D: IsFrontBufferAvailable cambio a {_image.IsFrontBufferAvailable}");
+
+        if (!_image.IsFrontBufferAvailable)
+        {
+            lock (_sync)
+                _frontBufferLost = true;
+
+            ReleaseBackBuffer();
+            return;
+        }
+
         lock (_sync)
+        {
+            _frontBufferLost = false;
+            if (!RecoverDevice("front buffer recuperado"))
+                return;
+
             SetBackBuffer();
+        }
+
+        // Mismo tamano, pero el D3DImage paso por 0x0 al quitarle el back buffer: se re-enlaza por
+        // las dudas (ver FrameChanged).
+        FrameChanged?.Invoke();
+    }
+
+    /// <summary>Hilo de UI. D3DImage deja de apuntar a nuestra superficie.</summary>
+    private void ReleaseBackBuffer()
+    {
+        if (_image is null)
+            return;
+
+        try
+        {
+            _image.Lock();
+            _image.SetBackBuffer(D3DResourceType.IDirect3DSurface9, IntPtr.Zero);
+        }
+        catch (Exception ex)
+        {
+            DiagLog.Write($"D3D: EXCEPCION al quitar el back buffer: {ex.Message}");
+        }
+        finally
+        {
+            _image.Unlock();
+        }
+    }
+
+    /// <summary>
+    /// Con <see cref="_sync"/> tomado. Tira el dispositivo D3D y todas sus texturas y los vuelve a
+    /// crear. La memoria donde decodifica VLC NO se toca (VLC escribe en ella sin lock). Devuelve
+    /// false si no se pudo (queda marcado como roto y se reintenta mas tarde).
+    /// </summary>
+    private bool RecoverDevice(string reason)
+    {
+        if (_isDisposed)
+            return false;
+
+        DiagLog.Write($"D3D: recreando dispositivo ({reason})");
+        _lastRecoveryTimestamp = Stopwatch.GetTimestamp();
+
+        try
+        {
+            DisposeGpuResources();
+            FreeRetired();
+            _yuvShader?.Dispose();
+            _yuvShader = null;
+            _flushQuery?.Dispose();
+            _flushQuery = null;
+            _device?.Dispose();
+            _device = null;
+            _d3d?.Dispose();
+            _d3d = null;
+
+            CreateDevice();
+            if (_mode == PixelMode.I420)
+                CreateYuvPipeline();
+
+            // Las constantes del shader vivian en el dispositivo viejo.
+            _colorDirty = true;
+
+            // Si todavia no llego ningun video, las texturas se crean en el callback de formato.
+            if (_bufferWidth > 0 && _bufferHeight > 0)
+                CreateGpuResources();
+
+            _deviceBroken = false;
+            Interlocked.Exchange(ref _pendingPaint, 0);
+            DiagLog.Write("D3D: dispositivo recreado");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _deviceBroken = true;
+            DiagLog.Write($"D3D: EXCEPCION al recrear el dispositivo: {ex}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Pide (en el hilo de UI) recrear el dispositivo tras un error al dibujar o presentar. Como
+    /// mucho una vez por segundo, para no entrar en un bucle si la GPU sigue sin responder. Con la
+    /// GPU perdida no se hace nada: la recuperacion llega con IsFrontBufferAvailable = true.
+    /// </summary>
+    private void ScheduleDeviceRecovery()
+    {
+        _dispatcher.BeginInvoke(() =>
+        {
+            if (_isDisposed || _image is null)
+                return;
+
+            lock (_sync)
+            {
+                if (!_deviceBroken || _frontBufferLost || !_image.IsFrontBufferAvailable)
+                    return;
+
+                var wait = TimeSpan.FromSeconds(1) - Stopwatch.GetElapsedTime(_lastRecoveryTimestamp);
+                if (wait > TimeSpan.Zero)
+                {
+                    // Muy pronto desde el ultimo intento: se reintenta una sola vez, al cumplirse el
+                    // segundo (un temporizador, no re-encolar en bucle, que dejaria la UI girando).
+                    if (!_recoveryRetryPending)
+                    {
+                        _recoveryRetryPending = true;
+                        var timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher) { Interval = wait };
+                        timer.Tick += (_, _) =>
+                        {
+                            timer.Stop();
+                            _recoveryRetryPending = false;
+                            ScheduleDeviceRecovery();
+                        };
+                        timer.Start();
+                    }
+
+                    return;
+                }
+
+                ReleaseBackBuffer();
+                if (!RecoverDevice("error al dibujar o presentar"))
+                    return;
+
+                SetBackBuffer();
+            }
+
+            FrameChanged?.Invoke();
+        }, DispatcherPriority.Normal);
     }
 
     /// <summary>Espera a que la GPU termine todo lo encolado en el dispositivo hasta ahora.</summary>
