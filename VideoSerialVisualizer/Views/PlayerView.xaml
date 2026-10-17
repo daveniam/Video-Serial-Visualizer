@@ -9,11 +9,14 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:PlayerViewModel}"
              Background="{StaticResource BgPrimaryBrush}"
+             Focusable="True" FocusVisualStyle="{x:Null}"
              PreviewKeyDown="OnPreviewKeyDown">
     <!-- Atajos del reproductor. Solo se disparan mientras el foco de teclado de WPF esta dentro de
-         este control (ver PlayerView.xaml.cs: se reclama el foco al cargar y tras cada clic). Los comandos de loop/segmento/paso
-         a cuadro se auto-protegen con IsAnimatorModeEnabled, asi que quedan activos sin filtrar nada
-         aca (en modo normal no hacen nada).
+         este control (ver PlayerView.xaml.cs: se reclama el foco al cargar y tras cada clic).
+         Por eso el control es Focusable: un UserControl NO lo es por defecto, y sin esto
+         Keyboard.Focus(this) no hace nada (el foco queda en la ventana y los atajos no disparan).
+         Los comandos de loop/segmento/paso a cuadro se auto-protegen con IsAnimatorModeEnabled, asi
+         que quedan activos sin filtrar nada aca (en modo normal no hacen nada).
 
          Convive lo "normal de reproductor" con lo especifico del modo animador sin pisarse:
            - Flechas solas = salto de 5s; con Shift = 10s. El paso a cuadro usa Ctrl+flechas y "," ".".
@@ -49,9 +52,29 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Button Grid.Row="0" Style="{StaticResource BackButtonStyle}" HorizontalAlignment="Left" Margin="16"
-                Click="BackButton_Click"
-                Command="{Binding BackCommand}" ToolTip="{loc:Tr Player_BackToLibrary}" />
+        <!-- Pantalla completa: el video ocupa TODA la pantalla (abarca las tres filas, ver VideoArea) y
+             el boton de volver y la barra de controles quedan flotando ENCIMA (ZIndex). Ambos se
+             ocultan juntos y reaparecen con el mouse sobre cualquiera de los dos (ShowControlsBar).
+             Antes esto no era posible: el video era una ventana nativa que tapaba cualquier control
+             superpuesto, asi que las filas de arriba y abajo quedaban como franjas negras. En ventana
+             normal nada cambia: cada cosa en su fila. -->
+        <Grid Grid.Row="0" Panel.ZIndex="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+              Background="Transparent"
+              MouseEnter="ControlsBar_MouseEnter" MouseLeave="ControlsBar_MouseLeave">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Opacity" Value="1" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowControlsBar}" Value="False">
+                            <Setter Property="Opacity" Value="0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Button Style="{StaticResource BackButtonStyle}" Margin="16"
+                    Click="BackButton_Click"
+                    Command="{Binding BackCommand}" ToolTip="{loc:Tr Player_BackToLibrary}" />
+        </Grid>
 
         <!-- El video es contenido WPF comun (render por callbacks de LibVLC, ver IVlcFrameRenderer):
              D3DImage si hay Direct3D 9Ex, WriteableBitmap si no. Antes se dibujaba en una ventana
@@ -63,16 +86,31 @@
                2. El cuadro exacto de FFmpeg, mientras se revisa cuadro a cuadro (modo animador).
              El clic va en el contenedor (y no en cada Image) para que tambien funcione sobre las
              bandas negras. -->
-        <Grid Grid.Row="1" x:Name="VideoArea" Background="Black"
+        <Grid x:Name="VideoArea" Background="Black"
               MouseLeftButtonDown="VideoArea_MouseLeftButtonDown">
+            <!-- La fila va en el Style (y no como atributo) para que el trigger pueda cambiarla: un
+                 valor local le ganaria al Style. -->
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Grid.Row" Value="1" />
+                    <Setter Property="Grid.RowSpan" Value="1" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsFullScreen}" Value="True">
+                            <Setter Property="Grid.Row" Value="0" />
+                            <Setter Property="Grid.RowSpan" Value="3" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
             <Image Source="{Binding VideoFrame}" Stretch="Uniform"
                    Visibility="{Binding IsLiveVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <Image Source="{Binding FrameStepImage}" Stretch="Uniform"
                    Visibility="{Binding IsFrameStepVisibleInMain, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-            <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. -->
-            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="6,3"
+            <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. Arriba a
+                 la derecha para no quedar debajo del boton de volver en pantalla completa. -->
+            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="6,3"
                     Background="#B0000000" CornerRadius="4" IsHitTestVisible="False"
                     Visibility="{Binding IsLiveVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="{Binding RendererStatsText}" Foreground="#FFFF6B6B" FontSize="11"
@@ -117,17 +155,22 @@
             </Button>
         </Grid>
 
-        <!-- En pantalla completa esta barra se oculta sola y solo reaparece con el mouse encima
-             (MouseEnter/MouseLeave en code-behind setean IsControlsBarHovered); en ventana normal
-             queda siempre visible. Se oculta con Opacity (no Visibility) a proposito: asi la fila
-             sigue reservando su alto (el video no se redimensiona cada vez que aparece/desaparece la
-             barra) y solo se desvanece sobre el fondo oscuro. -->
-        <Border Grid.Row="2" Background="{StaticResource BgSurfaceBrush}" Padding="16,10,16,10"
+        <!-- En pantalla completa esta barra flota sobre el video (ZIndex), semitransparente, y se
+             oculta sola: reaparece con el mouse encima (MouseEnter/MouseLeave en code-behind setean
+             IsControlsBarHovered). En ventana normal queda siempre visible y opaca, en su fila. Se
+             oculta con Opacity (no Visibility) a proposito: sigue recibiendo el mouse aunque no se
+             vea, que es justamente lo que la hace reaparecer al acercarse. -->
+        <Border Grid.Row="2" Panel.ZIndex="1" Padding="16,10,16,10"
                 MouseEnter="ControlsBar_MouseEnter" MouseLeave="ControlsBar_MouseLeave">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Opacity" Value="1" />
+                    <Setter Property="Background" Value="{StaticResource BgSurfaceBrush}" />
                     <Style.Triggers>
+                        <!-- Mismo color que BgSurfaceBrush (#1A1A20) con ~80% de opacidad. -->
+                        <DataTrigger Binding="{Binding IsFullScreen}" Value="True">
+                            <Setter Property="Background" Value="#CC1A1A20" />
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding ShowControlsBar}" Value="False">
                             <Setter Property="Opacity" Value="0" />
                         </DataTrigger>
