@@ -148,11 +148,19 @@ public partial class PlayerView : UserControl
     }
 
     // Clic sobre el video (en vivo, el cuadro congelado del paso a cuadro o las bandas negras):
-    // alterna play/pausa, que ademas sale del modo paso a cuadro.
+    // alterna play/pausa, que ademas sale del modo paso a cuadro. Doble clic: pantalla completa.
+    //
+    // Un doble clic llega como DOS eventos: el primero (ClickCount 1) ya alterno play/pausa, asi
+    // que el segundo (ClickCount 2) cambia a pantalla completa y vuelve a alternar para dejar la
+    // reproduccion como estaba (igual que YouTube o MPC). La alternativa, esperar el tiempo de doble
+    // clic antes de pausar, hacia que cada clic simple tardara ~0,5 s en responder.
     private void VideoArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is PlayerViewModel vm && vm.PlayPauseCommand.CanExecute(null))
             vm.PlayPauseCommand.Execute(null);
+
+        if (e.ClickCount == 2)
+            ToggleFullScreen();
 
         Keyboard.Focus(this);
     }
