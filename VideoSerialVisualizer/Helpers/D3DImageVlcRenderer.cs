@@ -841,13 +841,16 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
     /// <summary>
     /// WPF pierde el acceso a la GPU al bloquear la sesion, con Ctrl+Alt+Supr, un aviso de UAC o un
     /// reinicio del driver, y lo avisa poniendo IsFrontBufferAvailable en false (a veces varias
-    /// veces seguidas: false, true, false...). Patron documentado de D3DImage:
-    ///   * al perderla: dejar de dibujar y quitarle el back buffer;
-    ///   * al recuperarla: recrear el dispositivo y las texturas DESDE CERO y recien ahi darle el
-    ///     back buffer nuevo.
-    /// Antes se le devolvia la MISMA superficie: si en el medio el dispositivo de WPF se habia
-    /// reiniciado, WPF no podia abrirla y su hilo de render fallaba (UCEERR_RENDERTHREADFAILURE),
-    /// dejando la ventana en negro. Paso tras ~1 h de reproduccion, con un bloqueo de sesion.
+    /// veces seguidas: false, true, false...).
+    ///   * Al perderla: SOLO se deja de dibujar. NO se le quita el back buffer: el aviso de vuelta
+    ///     (IsFrontBufferAvailable = true) llega por un canal que WPF crea al asignarle un back
+    ///     buffer y destruye al quitarselo (SetBackBuffer con IntPtr.Zero). Quitarlo cortaba ese
+    ///     canal: tras desbloquear la sesion el aviso nunca llegaba y el video no volvia a verse
+    ///     (verificado en el registro de diagnostico con un Win+L real).
+    ///   * Al recuperarla: se recrean el dispositivo y las texturas DESDE CERO y se le da a WPF la
+    ///     superficie nueva, que reemplaza a la vieja. Darle la MISMA superficie de antes hacia
+    ///     fallar su hilo de render (UCEERR_RENDERTHREADFAILURE) si su dispositivo se habia
+    ///     reiniciado en el medio.
     /// </summary>
     private void OnFrontBufferAvailableChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
@@ -860,8 +863,6 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
         {
             lock (_sync)
                 _frontBufferLost = true;
-
-            ReleaseBackBuffer();
             return;
         }
 
@@ -874,30 +875,8 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
             SetBackBuffer();
         }
 
-        // Mismo tamano, pero el D3DImage paso por 0x0 al quitarle el back buffer: se re-enlaza por
-        // las dudas (ver FrameChanged).
+        // Mismo tamano, pero es otra superficie: se re-enlaza por las dudas (ver FrameChanged).
         FrameChanged?.Invoke();
-    }
-
-    /// <summary>Hilo de UI. D3DImage deja de apuntar a nuestra superficie.</summary>
-    private void ReleaseBackBuffer()
-    {
-        if (_image is null)
-            return;
-
-        try
-        {
-            _image.Lock();
-            _image.SetBackBuffer(D3DResourceType.IDirect3DSurface9, IntPtr.Zero);
-        }
-        catch (Exception ex)
-        {
-            DiagLog.Write($"D3D: EXCEPCION al quitar el back buffer: {ex.Message}");
-        }
-        finally
-        {
-            _image.Unlock();
-        }
     }
 
     /// <summary>
@@ -988,7 +967,8 @@ public sealed class D3DImageVlcRenderer : IVlcFrameRenderer
                     return;
                 }
 
-                ReleaseBackBuffer();
+                // Sin quitarle antes el back buffer a WPF (ver OnFrontBufferAvailableChanged): la
+                // superficie nueva reemplaza a la vieja en SetBackBuffer.
                 if (!RecoverDevice("error al dibujar o presentar"))
                     return;
 
