@@ -22,10 +22,10 @@ using VlcMediaPlayer = LibVLCSharp.Shared.MediaPlayer;
 namespace VideoSerialVisualizer.Helpers;
 
 /// <summary>
-/// EXPERIMENTAL (rama experimental/d3dimage). Muestra el video de LibVLC como contenido WPF a traves
-/// de una textura Direct3D 9Ex que WPF compone directo via <see cref="D3DImage"/>. Reemplaza tanto a
-/// la ventana nativa que se usaba en la reproduccion normal como al WriteableBitmap, que queda de
-/// respaldo (ver <see cref="VlcFrameRenderer"/>).
+/// Muestra el video de LibVLC como contenido WPF a traves de una textura Direct3D 9Ex que WPF
+/// compone directo via <see cref="D3DImage"/>. Reemplaza tanto a la ventana nativa que se usaba en
+/// la reproduccion normal como al WriteableBitmap, que queda de respaldo (ver
+/// <see cref="VlcFrameRenderer"/>).
 ///
 /// Dos modos:
 ///   * I420 (el normal): VLC entrega los tres planos Y, U, V tal como salen del decodificador

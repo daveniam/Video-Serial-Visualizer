@@ -8,9 +8,9 @@ using System.Text;
 namespace VideoSerialVisualizer.Helpers;
 
 /// <summary>
-/// EXPERIMENTAL (rama experimental/d3dimage). Compila HLSL en tiempo de ejecucion con
-/// d3dcompiler_47.dll, que Windows 10/11 trae de fabrica en System32: asi no hace falta ni una
-/// dependencia NuGet mas ni guardar bytecode precompilado ilegible en el repositorio.
+/// Compila HLSL en tiempo de ejecucion con d3dcompiler_47.dll, que Windows 10/11 trae de fabrica en
+/// System32: asi no hace falta ni una dependencia NuGet mas ni guardar bytecode precompilado
+/// ilegible en el repositorio.
 /// </summary>
 internal static class D3DShaderCompiler
 {

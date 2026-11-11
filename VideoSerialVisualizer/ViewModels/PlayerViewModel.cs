@@ -111,7 +111,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     /// <summary>Render del video como imagen WPF (modo animador). Null cuando dibuja LibVLC.</summary>
     private IVlcFrameRenderer? _frameRenderer;
 
-    /// <summary>Espacio de color del video actual (EXPERIMENTAL d3dimage). Null si no se pudo leer.</summary>
+    /// <summary>Espacio de color del video actual (lo usa el shader de D3D). Null si no se pudo leer.</summary>
     private VideoColorInfo? _videoColor;
 
     private int _videoPixelWidth;
@@ -357,8 +357,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private System.Windows.Media.ImageSource? videoFrame;
 
-    /// <summary>EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones
-    /// (fps, cuadros perdidos, costo en el hilo de UI). Se muestra sobre el video.</summary>
+    /// <summary>Renderer en uso y sus mediciones (fps, cuadros perdidos, costo en el hilo de UI, CPU).
+    /// Solo se muestra sobre el video con el diagnostico activado (VSV_DIAG=1, ver DiagLog).</summary>
     [ObservableProperty]
     private string? rendererStatsText;
 
@@ -369,6 +369,12 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     /// <summary>El video en vivo se muestra en la ventana principal.</summary>
     public bool IsLiveVideoVisible => !IsFrameStepActive && !IsReferenceWindowOpen;
+
+    /// <summary>Cartel de mediciones sobre el video en la ventana principal (solo con VSV_DIAG=1).</summary>
+    public bool IsRendererStatsVisible => DiagLog.IsEnabled && IsLiveVideoVisible;
+
+    /// <summary>Cartel de mediciones en la ventana de referencia (solo con VSV_DIAG=1).</summary>
+    public bool IsRendererStatsVisibleInReference => DiagLog.IsEnabled && !IsFrameStepActive;
 
     /// <summary>El cuadro congelado del paso a cuadro se muestra en la ventana principal.</summary>
     public bool IsFrameStepVisibleInMain => IsFrameStepActive && !IsReferenceWindowOpen;
@@ -404,6 +410,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     private void NotifyVideoSurfaceVisibilityChanged()
     {
         OnPropertyChanged(nameof(IsLiveVideoVisible));
+        OnPropertyChanged(nameof(IsRendererStatsVisible));
+        OnPropertyChanged(nameof(IsRendererStatsVisibleInReference));
         OnPropertyChanged(nameof(IsFrameStepVisibleInMain));
         OnPropertyChanged(nameof(IsPlayOverlayVisible));
     }
@@ -824,8 +832,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Conecta el renderer antes de cada Play. El video es SIEMPRE contenido WPF (ver
-    /// <see cref="IVlcFrameRenderer"/>): D3DImage si Direct3D 9Ex arranca (EXPERIMENTAL, rama
-    /// experimental/d3dimage), WriteableBitmap si no. Ya no existe el camino de ventana nativa.
+    /// <see cref="IVlcFrameRenderer"/>): D3DImage si Direct3D 9Ex arranca, WriteableBitmap si
+    /// no. Ya no existe el camino de ventana nativa.
     /// VSV_RENDERER=bitmap fuerza el WriteableBitmap y VSV_RENDERER=d3d-bgra el D3DImage sin shader,
     /// para comparar.
     /// </summary>

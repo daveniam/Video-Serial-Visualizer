@@ -108,11 +108,11 @@
             <Image Source="{Binding FrameStepImage}" Stretch="Uniform"
                    Visibility="{Binding IsFrameStepVisibleInMain, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-            <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. Arriba a
-                 la derecha para no quedar debajo del boton de volver en pantalla completa. -->
+            <!-- Diagnostico (solo con VSV_DIAG=1, ver DiagLog): renderer en uso y sus mediciones. Arriba
+                 a la derecha para no quedar debajo del boton de volver en pantalla completa. -->
             <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="6,3"
                     Background="#B0000000" CornerRadius="4" IsHitTestVisible="False"
-                    Visibility="{Binding IsLiveVideoVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    Visibility="{Binding IsRendererStatsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="{Binding RendererStatsText}" Foreground="#FFFF6B6B" FontSize="11"
                            FontFamily="Consolas" />
             </Border>

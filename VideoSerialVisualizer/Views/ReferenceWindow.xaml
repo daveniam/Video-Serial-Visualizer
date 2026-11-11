@@ -130,10 +130,10 @@
                 <Image Source="{Binding FrameStepImage}" Stretch="Uniform"
                        Visibility="{Binding IsFrameStepActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                <!-- EXPERIMENTAL (rama experimental/d3dimage): renderer en uso y sus mediciones. -->
+                <!-- Diagnostico (solo con VSV_DIAG=1, ver DiagLog): renderer en uso y sus mediciones. -->
                 <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Padding="5,2"
                         Background="#B0000000" CornerRadius="4" IsHitTestVisible="False"
-                        Visibility="{Binding IsFrameStepActive, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                        Visibility="{Binding IsRendererStatsVisibleInReference, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock Text="{Binding RendererStatsText}" Foreground="#FFFF6B6B" FontSize="10"
                                FontFamily="Consolas" />
                 </Border>

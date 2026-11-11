@@ -13,7 +13,7 @@ namespace VideoSerialVisualizer.Helpers;
 /// <summary>
 /// Render del video como contenido WPF comun (LibVLC entrega los cuadros por callbacks en vez de
 /// dibujar en una ventana nativa). Dos implementaciones: <see cref="D3DImageVlcRenderer"/>
-/// (EXPERIMENTAL, la principal: textura Direct3D 9Ex compartida con WPF, conversion de color en la
+/// (la principal: textura Direct3D 9Ex compartida con WPF, conversion de color en la
 /// GPU) y <see cref="VlcFrameRenderer"/> (respaldo: WriteableBitmap, todo por CPU).
 /// </summary>
 public interface IVlcFrameRenderer : IDisposable

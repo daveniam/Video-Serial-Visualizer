@@ -11,10 +11,10 @@ namespace VideoSerialVisualizer.Helpers;
 public enum YuvMatrix { Unknown, Bt601, Bt709, Bt2020 }
 
 /// <summary>
-/// EXPERIMENTAL (rama experimental/d3dimage). Espacio de color del video, necesario para que el
-/// shader de <see cref="D3DImageVlcRenderer"/> convierta YUV->RGB con los coeficientes correctos:
-/// con la matriz equivocada los colores salen corridos (rojos anaranjados, verdes apagados).
-/// VLC 3 no se lo informa a los callbacks de video, por eso se lee del archivo con FFmpeg.
+/// Espacio de color del video, necesario para que el shader de <see cref="D3DImageVlcRenderer"/>
+/// convierta YUV->RGB con los coeficientes correctos: con la matriz equivocada los colores salen
+/// corridos (rojos anaranjados, verdes apagados). VLC 3 no se lo informa a los callbacks de video,
+/// por eso se lee del archivo con FFmpeg.
 /// </summary>
 public readonly record struct VideoColorInfo(YuvMatrix Matrix, bool FullRange)
 {

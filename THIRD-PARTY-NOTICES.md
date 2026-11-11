@@ -115,7 +115,7 @@ etiquetas de linea de tiempo.
 Panel de WPF que virtualiza el layout tipo "wrap": solo arma las tarjetas visibles. Se usa en
 Explorar y en la Biblioteca para que abrir grupos con muchos videos sea fluido.
 
-## Vortice.Direct3D9 — Amer Koleci (EXPERIMENTAL, rama experimental/d3dimage)
+## Vortice.Direct3D9 — Amer Koleci
 
 - **Versión:** 3.8.3, con sus dependencias Vortice.Mathematics 2.1.0, SharpGen.Runtime 2.4.2-beta
   y SharpGen.Runtime.COM 2.4.2-beta
