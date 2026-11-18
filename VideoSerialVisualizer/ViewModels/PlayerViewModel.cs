@@ -845,6 +845,8 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
             NotifyFrameStepAvailabilityChanged();
         }
 
+        LoadSeekIndexInBackground(video.RutaAbsoluta);
+
         ConfigureVideoOutput(video.RutaAbsoluta);
 
         MediaPlayer.Play(_media);
@@ -882,6 +884,39 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     /// <summary>Descarta sondeos de color de un video anterior que terminan tarde.</summary>
     private int _colorProbeGeneration;
+
+    // --- Seeks limpios en MP4 fragmentados ---
+    //
+    // En un MP4 fragmentado (el formato de streaming de los videos descargados de plataformas web)
+    // VLC 3 no retrocede al cuadro clave al hacer un seek: arranca sin cuadro de referencia y se ve
+    // gris/con bloques hasta el siguiente cuadro clave. Saltando al inicio de un fragmento se ve
+    // limpio, asi que en esos archivos todo seek se ajusta al inicio de fragmento anterior (unos
+    // segundos antes del punto pedido). En un MP4 normal el indice es null y nada cambia.
+
+    private FragmentedMp4Index? _seekIndex;
+    private int _seekIndexGeneration;
+
+    /// <summary>Arma el indice de fragmentos sin demorar el arranque. Lee solo cabeceras (unos ms),
+    /// asi que suele estar listo antes de que VLC empiece a reproducir.</summary>
+    private async void LoadSeekIndexInBackground(string path)
+    {
+        _seekIndex = null;
+        var generation = ++_seekIndexGeneration;
+        var index = await Task.Run(() => FragmentedMp4Index.TryBuild(path));
+        if (generation == _seekIndexGeneration)
+        {
+            _seekIndex = index;
+            DiagLog.Write($"VM: indice de fragmentos {(index is null ? "no (MP4 normal)" : $"{index.FragmentStartsMs.Count} inicios")}");
+        }
+    }
+
+    /// <summary>Destino de seek que VLC muestra limpio: el pedido tal cual, salvo en un MP4
+    /// fragmentado. <paramref name="mustExceedMs"/> evita que un salto hacia adelante termine
+    /// retrocediendo por el ajuste.</summary>
+    private double CleanSeekTarget(double targetMs, double? mustExceedMs = null)
+        => _seekIndex is { } index
+            ? index.Snap((long)targetMs, mustExceedMs is double floor ? (long)floor : null)
+            : targetMs;
 
     /// <summary>
     /// El renderer vive mientras viva el reproductor y se reutiliza entre videos: sus recursos se
@@ -973,8 +1008,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
                 _hasAppliedSavedPosition = true;
                 if (PositionMs > 0)
                 {
-                    MediaPlayer.Time = (long)PositionMs;
-                    BeginSeekSettleWindow(PositionMs);
+                    var resume = CleanSeekTarget(PositionMs);
+                    PositionMs = resume;
+                    CurrentTimeText = FormatTime(resume);
+                    MediaPlayer.Time = (long)resume;
+                    BeginSeekSettleWindow(resume);
                 }
             }
 
@@ -1104,6 +1142,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     private void SeekToLoopStart(double start)
     {
+        start = CleanSeekTarget(start);
         MediaPlayer.Time = (long)start;
         BeginSeekSettleWindow(start);
         PositionMs = start;
@@ -1275,8 +1314,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         // una sola vez aca, no en cada cuadro revisado.
         if (IsFrameStepActive)
         {
-            MediaPlayer.Time = (long)PositionMs;
-            BeginSeekSettleWindow(PositionMs);
+            var target = CleanSeekTarget(PositionMs);
+            PositionMs = target;
+            CurrentTimeText = FormatTime(target);
+            MediaPlayer.Time = (long)target;
+            BeginSeekSettleWindow(target);
         }
 
         IsFrameStepActive = false;
@@ -1703,7 +1745,7 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         if (now - _lastScrubSeekTick >= ScrubSeekThrottleMs)
         {
             _lastScrubSeekTick = now;
-            MediaPlayer.Time = (long)target;
+            MediaPlayer.Time = (long)CleanSeekTarget(target);
         }
     }
 
@@ -1724,11 +1766,12 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     /// <summary>Salta a una posicion puntual (p.ej. clic en un marcador de la linea de tiempo): sale
     /// del paso a cuadro si estaba activo, mueve VLC y registra la ventana de asentamiento del seek.</summary>
-    private void SeekTo(double targetMs)
+    private void SeekTo(double targetMs, double? mustExceedMs = null)
     {
         if (IsFrameStepActive)
             ExitFrameStep();
 
+        targetMs = CleanSeekTarget(targetMs, mustExceedMs);
         PositionMs = targetMs;
         MediaPlayer.Time = (long)targetMs;
         BeginSeekSettleWindow(targetMs);
@@ -1807,7 +1850,9 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
         if (CurrentVideo is null || DurationMs <= 0)
             return;
 
-        SeekTo(Math.Clamp(PositionMs + deltaMs, 0, DurationMs));
+        // Hacia adelante, el ajuste a inicio de fragmento (MP4 fragmentados) nunca debe terminar
+        // detras de la posicion actual: se exige pasarla.
+        SeekTo(Math.Clamp(PositionMs + deltaMs, 0, DurationMs), deltaMs > 0 ? PositionMs : null);
     }
 
     [RelayCommand]
