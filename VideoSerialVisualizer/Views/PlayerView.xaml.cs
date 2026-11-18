@@ -22,9 +22,49 @@ public partial class PlayerView : UserControl
     {
         InitializeComponent();
 
+        _mouseIdleTimer = new System.Windows.Threading.DispatcherTimer { Interval = MouseIdleDelay };
+        _mouseIdleTimer.Tick += OnMouseIdle;
+
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
     }
+
+    // --- Controles y cursor en pantalla completa ---
+    // Con el mouse quieto MouseIdleDelay, los controles se ocultan y el cursor desaparece; cualquier
+    // movimiento los vuelve a mostrar (ver ShowControlsBar / HideCursor en el ViewModel).
+    private static readonly TimeSpan MouseIdleDelay = TimeSpan.FromSeconds(2.5);
+    private readonly System.Windows.Threading.DispatcherTimer _mouseIdleTimer;
+    private Point? _lastMousePosition;
+
+    private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (DataContext is not PlayerViewModel vm)
+            return;
+
+        // WPF tambien dispara MouseMove sin que el mouse se mueva (por ejemplo cuando aparece o
+        // desaparece un control bajo el cursor): solo cuenta un cambio real de posicion, si no los
+        // controles nunca terminarian de ocultarse.
+        var position = e.GetPosition(this);
+        if (_lastMousePosition == position)
+            return;
+        _lastMousePosition = position;
+
+        vm.IsMouseActive = true;
+        _mouseIdleTimer.Stop();
+        _mouseIdleTimer.Start();
+    }
+
+    private void OnMouseIdle(object? sender, EventArgs e)
+    {
+        _mouseIdleTimer.Stop();
+        if (DataContext is PlayerViewModel vm)
+            vm.IsMouseActive = false;
+    }
+
+    // Al elegir una opcion en un desplegable (subtitulos, velocidad) el foco queda en el ComboBox y
+    // las flechas pasan a cambiar su opcion en vez de mover el video. Se devuelve a la vista para
+    // que los atajos sigan funcionando.
+    private void ComboBox_DropDownClosed(object? sender, EventArgs e) => Keyboard.Focus(this);
 
     private Window? _hostWindow;
 
@@ -132,6 +172,11 @@ public partial class PlayerView : UserControl
     {
         var vm = _vm;
         _vm = null;
+
+        _mouseIdleTimer.Stop();
+        _lastMousePosition = null;
+        if (vm is not null)
+            vm.IsMouseActive = false;
 
         // Red de seguridad para cualquier otra forma de salir del reproductor en pantalla completa
         // (error de reproduccion, siguiente video sin mas items...): se restaura la ventana para no

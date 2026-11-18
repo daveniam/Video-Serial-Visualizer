@@ -389,14 +389,32 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool isControlsBarHovered;
 
-    /// <summary>Si la barra de controles debe mostrarse: siempre en ventana normal; en pantalla
-    /// completa, solo mientras el mouse esta sobre esa zona (igual que YouTube/VLC), para que el
-    /// video aproveche toda la pantalla el resto del tiempo.</summary>
-    public bool ShowControlsBar => !IsFullScreen || IsControlsBarHovered;
+    /// <summary>El mouse se movio hace poco (en pantalla completa). Lo maneja la vista: se pone en
+    /// true con cada movimiento y vuelve a false tras unos segundos quieto (ver PlayerView.xaml.cs).</summary>
+    [ObservableProperty]
+    private bool isMouseActive;
 
-    partial void OnIsFullScreenChanged(bool value) => OnPropertyChanged(nameof(ShowControlsBar));
+    /// <summary>
+    /// Si los controles (barra y boton de volver) deben mostrarse. En ventana normal, siempre. En
+    /// pantalla completa, como en YouTube: aparecen con cualquier movimiento del mouse y se ocultan
+    /// tras unos segundos quieto, salvo que el mouse este sobre la barra o el video este en pausa.
+    /// </summary>
+    public bool ShowControlsBar => !IsFullScreen || IsMouseActive || IsControlsBarHovered || !IsPlaying;
 
-    partial void OnIsControlsBarHoveredChanged(bool value) => OnPropertyChanged(nameof(ShowControlsBar));
+    /// <summary>Ocultar el cursor: pantalla completa con los controles ocultos (mouse quieto).</summary>
+    public bool HideCursor => IsFullScreen && !ShowControlsBar;
+
+    private void NotifyControlsVisibilityChanged()
+    {
+        OnPropertyChanged(nameof(ShowControlsBar));
+        OnPropertyChanged(nameof(HideCursor));
+    }
+
+    partial void OnIsFullScreenChanged(bool value) => NotifyControlsVisibilityChanged();
+
+    partial void OnIsControlsBarHoveredChanged(bool value) => NotifyControlsVisibilityChanged();
+
+    partial void OnIsMouseActiveChanged(bool value) => NotifyControlsVisibilityChanged();
 
     /// <summary>
     /// Boton de play grande al centro del video (estilo YouTube), visible solo con el video pausado.
@@ -420,7 +438,11 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
 
     partial void OnIsReferenceWindowOpenChanged(bool value) => NotifyVideoSurfaceVisibilityChanged();
 
-    partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
+    partial void OnIsPlayingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsPlayOverlayVisible));
+        NotifyControlsVisibilityChanged();
+    }
 
     partial void OnCurrentVideoChanged(Video? value) => OnPropertyChanged(nameof(IsPlayOverlayVisible));
 
@@ -1812,6 +1834,27 @@ public partial class PlayerViewModel : ObservableObject, IDisposable
     }
 
     partial void OnSelectedPlaybackSpeedChanged(PlaybackSpeedOption value) => ApplyPlaybackSpeed();
+
+    // Atajos de velocidad (Shift+. y Shift+, como en YouTube): pasan a la velocidad siguiente o
+    // anterior de la lista fija, sin salirse de los extremos.
+
+    [RelayCommand]
+    private void SpeedUp() => StepPlaybackSpeed(+1);
+
+    [RelayCommand]
+    private void SpeedDown() => StepPlaybackSpeed(-1);
+
+    private void StepPlaybackSpeed(int direction)
+    {
+        var speeds = PlaybackSpeedOption.All;
+        var current = speeds.ToList().IndexOf(SelectedPlaybackSpeed ?? PlaybackSpeedOption.Normal);
+        if (current < 0)
+            current = speeds.ToList().IndexOf(PlaybackSpeedOption.Normal);
+
+        var next = Math.Clamp(current + direction, 0, speeds.Count - 1);
+        if (next != current)
+            SelectedPlaybackSpeed = speeds[next];
+    }
 
     /// <summary>
     /// Aplica la velocidad al reproductor. SetRate devuelve distinto de 0 si falla (algunos

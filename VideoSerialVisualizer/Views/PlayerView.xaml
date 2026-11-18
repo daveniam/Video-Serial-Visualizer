@@ -10,7 +10,8 @@
              d:DataContext="{d:DesignInstance Type=vm:PlayerViewModel}"
              Background="{StaticResource BgPrimaryBrush}"
              Focusable="True" FocusVisualStyle="{x:Null}"
-             PreviewKeyDown="OnPreviewKeyDown">
+             PreviewKeyDown="OnPreviewKeyDown"
+             PreviewMouseMove="OnPreviewMouseMove">
     <!-- Atajos del reproductor. Solo se disparan mientras el foco de teclado de WPF esta dentro de
          este control (ver PlayerView.xaml.cs: se reclama el foco al cargar y tras cada clic).
          Por eso el control es Focusable: un UserControl NO lo es por defecto, y sin esto
@@ -34,6 +35,10 @@
         <KeyBinding Key="Up" Command="{Binding VolumeUpCommand}" />
         <KeyBinding Key="Down" Command="{Binding VolumeDownCommand}" />
         <KeyBinding Key="M" Command="{Binding MarkerOrMuteCommand}" />
+        <!-- Velocidad: Shift+. sube y Shift+, baja (como YouTube). No chocan con "," "." solas, que
+             son el paso a cuadro del modo animador. -->
+        <KeyBinding Modifiers="Shift" Key="OemPeriod" Command="{Binding SpeedUpCommand}" />
+        <KeyBinding Modifiers="Shift" Key="OemComma" Command="{Binding SpeedDownCommand}" />
 
         <!-- Modo animador (no-op en modo normal) -->
         <KeyBinding Key="OemComma" Command="{Binding StepFrameBackwardCommand}" />
@@ -54,7 +59,9 @@
 
         <!-- Pantalla completa: el video ocupa TODA la pantalla (abarca las tres filas, ver VideoArea) y
              el boton de volver y la barra de controles quedan flotando ENCIMA (ZIndex). Ambos se
-             ocultan juntos y reaparecen con el mouse sobre cualquiera de los dos (ShowControlsBar).
+             ocultan juntos tras unos segundos con el mouse quieto y reaparecen al moverlo (ShowControlsBar).
+             Ocultos NO reciben clics (IsHitTestVisible): asi un clic con el mouse quieto llega al video y
+             no a un boton invisible.
              Antes esto no era posible: el video era una ventana nativa que tapaba cualquier control
              superpuesto, asi que las filas de arriba y abajo quedaban como franjas negras. En ventana
              normal nada cambia: cada cosa en su fila. -->
@@ -67,6 +74,7 @@
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding ShowControlsBar}" Value="False">
                             <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -98,6 +106,10 @@
                         <DataTrigger Binding="{Binding IsFullScreen}" Value="True">
                             <Setter Property="Grid.Row" Value="0" />
                             <Setter Property="Grid.RowSpan" Value="3" />
+                        </DataTrigger>
+                        <!-- Mouse quieto en pantalla completa: se oculta el cursor (ver HideCursor). -->
+                        <DataTrigger Binding="{Binding HideCursor}" Value="True">
+                            <Setter Property="Cursor" Value="None" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -156,10 +168,10 @@
         </Grid>
 
         <!-- En pantalla completa esta barra flota sobre el video (ZIndex), semitransparente, y se
-             oculta sola: reaparece con el mouse encima (MouseEnter/MouseLeave en code-behind setean
-             IsControlsBarHovered). En ventana normal queda siempre visible y opaca, en su fila. Se
-             oculta con Opacity (no Visibility) a proposito: sigue recibiendo el mouse aunque no se
-             vea, que es justamente lo que la hace reaparecer al acercarse. -->
+             oculta sola tras unos segundos con el mouse quieto (ver ShowControlsBar); mientras el
+             mouse esta encima no se oculta (MouseEnter/MouseLeave setean IsControlsBarHovered). En
+             ventana normal queda siempre visible y opaca, en su fila. Se oculta con Opacity (no
+             Visibility) para que el video no cambie de tamano al aparecer y desaparecer. -->
         <Border Grid.Row="2" Panel.ZIndex="1" Padding="16,10,16,10"
                 MouseEnter="ControlsBar_MouseEnter" MouseLeave="ControlsBar_MouseLeave">
             <Border.Style>
@@ -173,6 +185,7 @@
                         </DataTrigger>
                         <DataTrigger Binding="{Binding ShowControlsBar}" Value="False">
                             <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -576,6 +589,7 @@
                     <ComboBox Grid.Column="6" Style="{StaticResource DarkComboBoxStyle}" Width="140" Margin="8,0,0,0"
                               ItemsSource="{Binding SubtitleTracks}" DisplayMemberPath="Name"
                               SelectedItem="{Binding SelectedSubtitleTrack, Mode=TwoWay}"
+                              DropDownClosed="ComboBox_DropDownClosed"
                               Visibility="{Binding HasMultipleSubtitleTracks, Converter={StaticResource BooleanToVisibilityConverter}}"
                               ToolTip="{loc:Tr Player_ChooseSubtitleTrack}" />
 
@@ -583,6 +597,7 @@
                     <ComboBox Grid.Column="7" Style="{StaticResource DarkComboBoxStyle}" Width="82" Margin="8,0,0,0"
                               ItemsSource="{Binding PlaybackSpeeds}" DisplayMemberPath="Label"
                               SelectedItem="{Binding SelectedPlaybackSpeed, Mode=TwoWay}"
+                              DropDownClosed="ComboBox_DropDownClosed"
                               ToolTip="{loc:Tr Player_PlaybackSpeed}" />
 
                     <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
