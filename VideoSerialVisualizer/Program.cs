@@ -35,7 +35,12 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        VelopackApp.Build().Run();
+        // Al instalar o actualizar con Velopack se quitan las otras copias de la app (Inno Setup o
+        // el script viejo), para no tener dos programas instalados. Ver OtherInstallsCleaner.
+        VelopackApp.Build()
+            .OnAfterInstallFastCallback(_ => OtherInstallsCleaner.RemoveOtherInstalls())
+            .OnAfterUpdateFastCallback(_ => OtherInstallsCleaner.RemoveOtherInstalls())
+            .Run();
 
         // El idioma se fija antes de crear la ventana: la pantalla de carga ya aparece traducida.
         // Si el usuario nunca eligio uno, se usa el de Windows (con ingles como respaldo).

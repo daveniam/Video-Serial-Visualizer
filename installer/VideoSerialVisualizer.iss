@@ -45,6 +45,9 @@ WizardStyle=modern
 ; La app es x64-only (self-contained win-x64).
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+; Mismo mutex de instancia unica que crea la app (App.xaml.cs): si esta abierta, el asistente pide
+; cerrarla antes de instalar, para no reemplazar archivos en uso.
+AppMutex=VideoSerialVisualizer-SingleInstance-9F3B2A7C
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -66,3 +69,89 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+{ Quita las OTRAS instalaciones de la app antes de copiar los archivos, para que nunca queden dos
+  programas instalados (la app hace lo mismo del otro lado al instalarse con Velopack, ver
+  Services\OtherInstallsCleaner.cs):
+    * Velopack (Setup con auto-actualizacion): %LocalAppData%\VideoSerialVisualizer. Se usa su
+      propio desinstalador en modo silencioso, que tambien quita sus accesos directos y su entrada
+      en "Aplicaciones".
+    * Install.ps1 (el script de las primeras versiones, sin desinstalador): una carpeta en
+      %LocalAppData%\Programs; se borran la carpeta y SUS accesos directos.
+  Solo se borran programas: la biblioteca, el progreso y las miniaturas viven en
+  %LocalAppData%\TutorialHub y no se tocan. }
+
+{ True si Path es Dir o esta dentro de Dir (sin distinguir mayusculas). }
+function IsSameOrInside(Path, Dir: String): Boolean;
+begin
+  Path := Lowercase(RemoveBackslashUnlessRoot(Path));
+  Dir := Lowercase(RemoveBackslashUnlessRoot(Dir));
+  Result := (Path = Dir) or (Pos(Dir + '\', Path) = 1);
+end;
+
+{ Borra un acceso directo solo si apunta DENTRO de Dir. Se mira el destino y no el nombre: todas
+  las instalaciones crean un "Video Serial Visualizer.lnk", y por nombre se borraria tambien el
+  de esta instalacion. }
+procedure DeleteShortcutIfInside(LinkPath, Dir: String);
+var
+  Shell, Link: Variant;
+begin
+  if not FileExists(LinkPath) then
+    exit;
+  try
+    Shell := CreateOleObject('WScript.Shell');
+    Link := Shell.CreateShortcut(LinkPath);
+    if IsSameOrInside(Link.TargetPath, Dir) then
+      DeleteFile(LinkPath);
+  except
+    { un acceso directo ilegible no frena la instalacion }
+  end;
+end;
+
+{ Borra una instalacion que es solo una carpeta (la del script viejo), con sus accesos directos.
+  Nunca la carpeta donde se esta instalando ahora. }
+procedure RemoveFolderInstall(Dir: String);
+begin
+  if not DirExists(Dir) then
+    exit;
+  if IsSameOrInside(WizardDirValue, Dir) or IsSameOrInside(Dir, WizardDirValue) then
+    exit;
+  Log('Quitando instalacion anterior: ' + Dir);
+  DeleteShortcutIfInside(ExpandConstant('{userdesktop}\Video Serial Visualizer.lnk'), Dir);
+  DeleteShortcutIfInside(ExpandConstant('{userprograms}\Video Serial Visualizer.lnk'), Dir);
+  DeleteShortcutIfInside(ExpandConstant('{userdesktop}\TutorialHub.lnk'), Dir);
+  DeleteShortcutIfInside(ExpandConstant('{userprograms}\TutorialHub.lnk'), Dir);
+  DelTree(Dir, True, True, True);
+end;
+
+{ Desinstala en silencio la copia de Velopack, si la hay. }
+procedure RemoveVelopackInstall();
+var
+  Dir, UpdateExe: String;
+  ResultCode: Integer;
+begin
+  Dir := ExpandConstant('{localappdata}\VideoSerialVisualizer');
+  UpdateExe := Dir + '\Update.exe';
+  if not FileExists(UpdateExe) then
+    exit;
+  if IsSameOrInside(WizardDirValue, Dir) then
+    exit;
+  Log('Desinstalando la copia de Velopack: ' + Dir);
+  if not Exec(UpdateExe, '--silent uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Log('No se pudo ejecutar el desinstalador de Velopack: ' + SysErrorMessage(ResultCode))
+  else
+    Log('Desinstalador de Velopack termino con codigo ' + IntToStr(ResultCode));
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  { ssInstall: justo antes de copiar archivos y crear accesos directos. Asi los desinstaladores
+    de las otras copias no pueden llevarse los accesos directos que crea esta instalacion. }
+  if CurStep = ssInstall then
+  begin
+    RemoveVelopackInstall();
+    RemoveFolderInstall(ExpandConstant('{localappdata}\Programs\VideoSerialVisualizer'));
+    RemoveFolderInstall(ExpandConstant('{localappdata}\Programs\TutorialHub'));
+  end;
+end;
