@@ -429,9 +429,11 @@ public partial class FoldersViewModel : ObservableObject
                 tagsByFolder.TryGetValue(group.FolderPath, out var categoryIds);
 
                 // Portada elegida a mano (clic derecho en la barra del reproductor) tiene prioridad
-                // sobre la miniatura del ultimo video. Si el archivo ya no esta, se cae al default.
+                // sobre la miniatura del ultimo video. Si el archivo ya no esta, o salio negra (ver
+                // ThumbnailService.IsBlankImage), se cae al default.
                 var coverPath = category?.CoverImagePath;
                 var effectiveThumbnail = !string.IsNullOrEmpty(coverPath) && File.Exists(coverPath)
+                                         && !ThumbnailService.IsBlankImage(coverPath)
                     ? coverPath
                     : thumbnailPath;
 

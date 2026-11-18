@@ -124,15 +124,22 @@ public class FolderScannerService
     private static void ApplyThumbnailResult(Video video, ThumbnailService.ThumbnailResult result)
     {
         if (result.ThumbnailPath is not null)
+        {
             video.ThumbnailPath = result.ThumbnailPath;
+            // Se regenera en el mismo archivo ({id}.jpg): la imagen vieja no debe quedar en cache.
+            Helpers.ThumbnailLoader.Invalidate(result.ThumbnailPath);
+        }
 
         if (result.DurationMs > 0)
             video.DuracionMs = result.DurationMs;
     }
 
-    /// <summary>El video tiene una miniatura y su archivo sigue existiendo.</summary>
+    /// <summary>El video tiene una miniatura, su archivo sigue existiendo y no es una captura negra.
+    /// Las negras salian en videos con cuadros clave muy separados (ver ThumbnailService): asi se
+    /// regeneran solas en el proximo escaneo.</summary>
     private static bool HasThumbnail(Video v)
-        => !string.IsNullOrEmpty(v.ThumbnailPath) && File.Exists(v.ThumbnailPath);
+        => !string.IsNullOrEmpty(v.ThumbnailPath) && File.Exists(v.ThumbnailPath)
+           && !ThumbnailService.IsBlankImage(v.ThumbnailPath);
 
     /// <summary>Detecta el metadata "AppleDouble" que macOS deja junto a cada archivo real al copiar
     /// a un disco no-Mac: mismo nombre con el prefijo "._", sin video adentro.</summary>

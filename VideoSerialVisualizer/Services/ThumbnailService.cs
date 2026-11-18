@@ -23,6 +23,14 @@ public class ThumbnailService
     private const int FileWritePollIntervalMs = 100;
     private const int FileWriteTimeoutMs = 2500;
 
+    // Tras un salto, VLC puede mostrar NEGRO un buen rato: si los cuadros clave del video estan muy
+    // separados (tipico de grabaciones de diapositivas o de pantalla), no tiene imagen hasta llegar
+    // al siguiente. Medido en videos reales: negro durante mas de 2 s despues de saltar. Mientras la
+    // captura salga en negro se reintenta en el mismo punto, hasta este limite, antes de pasar al
+    // siguiente. En videos normales la primera captura ya sale bien y no se espera nada extra.
+    private const int VisibleFrameTimeoutMs = 6000;
+    private const int VisibleFrameRetryDelayMs = 500;
+
     // Posiciones (fraccion de la duracion) donde se intenta capturar, en orden. Si una falla se
     // prueba la siguiente: en algunos videos el punto elegido cae en una transicion o un tramo que
     // el decoder no resuelve bien, pero otro punto si.
@@ -146,14 +154,16 @@ public class ThumbnailService
 
                 await Task.Delay(SeekSettleDelayMs);
 
-                if (await TrySnapshotAsync(mediaPlayer, outputPath))
+                if (await SnapshotUntilVisibleAsync(mediaPlayer, outputPath))
                     return true;
 
                 if (durationMs <= 0)
-                    return false;
+                    return HasFile(outputPath);
             }
 
-            return false;
+            // Ningun punto dio una imagen con contenido: se conserva la ultima captura (aunque sea
+            // oscura) antes que no dejar nada, como antes.
+            return HasFile(outputPath);
         }
         finally
         {
@@ -210,20 +220,28 @@ public class ThumbnailService
             if (durationMs <= 0)
             {
                 await Task.Delay(SeekSettleDelayMs);
-                return (await TrySnapshotAsync(mediaPlayer, outputPath), 0);
+                await SnapshotUntilVisibleAsync(mediaPlayer, outputPath);
+                return (HasFile(outputPath), 0);
             }
 
-            // Se prueban varias posiciones hasta que una produzca un archivo valido.
+            // Se prueban varias posiciones hasta que una produzca una imagen con contenido. Si todas
+            // salen negras (video realmente oscuro), se conserva la ultima captura: el escaneo la
+            // vuelve a intentar mas adelante (ver FolderScannerService.HasThumbnail).
+            // En un MP4 fragmentado se salta al inicio de un fragmento, que VLC muestra limpio de
+            // inmediato (ver FragmentedMp4Index); si no, la imagen sale gris o negra por segundos.
+            var seekIndex = Helpers.FragmentedMp4Index.TryBuild(videoPath);
+
             foreach (var position in SnapshotPositions)
             {
-                mediaPlayer.Time = (long)(durationMs * position);
+                var target = (long)(durationMs * position);
+                mediaPlayer.Time = seekIndex?.Snap(target) ?? target;
                 await Task.Delay(SeekSettleDelayMs);
 
-                if (await TrySnapshotAsync(mediaPlayer, outputPath))
+                if (await SnapshotUntilVisibleAsync(mediaPlayer, outputPath))
                     return (true, durationMs);
             }
 
-            return (false, durationMs);
+            return (HasFile(outputPath), durationMs);
         }
         finally
         {
@@ -233,9 +251,70 @@ public class ThumbnailService
         }
     }
 
+    /// <summary>
+    /// Captura en la posicion actual hasta que la imagen tenga contenido (no sea negra), o hasta
+    /// <see cref="VisibleFrameTimeoutMs"/>. Devuelve true si quedo una imagen con contenido.
+    /// </summary>
+    private static async Task<bool> SnapshotUntilVisibleAsync(MediaPlayer mediaPlayer, string outputPath)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (true)
+        {
+            if (await TrySnapshotAsync(mediaPlayer, outputPath) && !IsBlankImage(outputPath))
+                return true;
+
+            if (watch.ElapsedMilliseconds + VisibleFrameRetryDelayMs > VisibleFrameTimeoutMs)
+                return false;
+
+            await Task.Delay(VisibleFrameRetryDelayMs);
+        }
+    }
+
+    /// <summary>
+    /// La imagen es (casi) negra: lo que deja VLC tras un salto antes de tener cuadro. Se decodifica
+    /// a 48 px de ancho, asi que es barato. Si el archivo no se puede leer se considera vacio.
+    /// </summary>
+    public static bool IsBlankImage(string path)
+    {
+        try
+        {
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            image.BeginInit();
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.IgnoreImageCache;
+            image.DecodePixelWidth = 48;
+            image.UriSource = new Uri(path);
+            image.EndInit();
+
+            var gray = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                image, System.Windows.Media.PixelFormats.Gray8, null, 0);
+            var stride = gray.PixelWidth;
+            var pixels = new byte[stride * gray.PixelHeight];
+            gray.CopyPixels(pixels, stride, 0);
+
+            // Negro "de verdad": todo oscuro y sin detalle claro. Un video oscuro pero con contenido
+            // (texto, un personaje iluminado) tiene una parte apreciable de pixeles claros. Se usa
+            // el percentil 99 y no el maximo, para que un par de pixeles sueltos (un artefacto del
+            // decoder a medio cuadro, el cursor) no hagan pasar por buena una captura negra.
+            Array.Sort(pixels);
+            var p99 = pixels[(int)(pixels.Length * 0.99)];
+            return p99 < 40 && pixels.Average(p => (double)p) < 12;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static bool HasFile(string path) => File.Exists(path) && new FileInfo(path).Length > 0;
+
     /// <summary>Toma un snapshot y espera a que el archivo quede escrito con contenido.</summary>
     private static async Task<bool> TrySnapshotAsync(MediaPlayer mediaPlayer, string outputPath)
     {
+        // Se borra la captura anterior: si no, la espera de abajo veria el archivo viejo y daria por
+        // escrita una captura que todavia no llego (importa al reintentar en SnapshotUntilVisible).
+        TryDeleteFile(outputPath);
+
         if (!mediaPlayer.TakeSnapshot(0, outputPath, 0, 0))
             return false;
 

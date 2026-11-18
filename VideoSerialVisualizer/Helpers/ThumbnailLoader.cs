@@ -25,6 +25,23 @@ public static class ThumbnailLoader
     private static readonly object CacheLock = new();
 
     /// <summary>
+    /// Olvida la imagen cacheada de esa ruta. Hace falta cuando una miniatura se regenera en el
+    /// MISMO archivo (p.ej. {id}.jpg al re-escanear): sin esto se seguiria mostrando la vieja hasta
+    /// reiniciar la app.
+    /// </summary>
+    public static void Invalidate(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        lock (CacheLock)
+        {
+            if (Cache.Remove(path))
+                CacheOrder.Remove(path);
+        }
+    }
+
+    /// <summary>
     /// Devuelve la miniatura desde la cache o la decodifica en segundo plano. Evita re-decodificar
     /// las mismas imagenes cada vez que se vuelve a una vista, y limita cuantas se procesan a la vez.
     /// </summary>
