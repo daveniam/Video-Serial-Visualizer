@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<FolderTag> FolderTags => Set<FolderTag>();
     public DbSet<VideoMarker> Markers => Set<VideoMarker>();
+    public DbSet<Course> Courses => Set<Course>();
 
     /// <summary>
     /// IMPORTANTE: se mantiene el nombre historico "TutorialHub" a proposito, aunque el proyecto
@@ -91,6 +92,16 @@ public class AppDbContext : DbContext
             .HasForeignKey(t => t.CategoryId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Borrar un curso deja a sus grupos sueltos (CourseId = NULL), nunca los borra.
+        modelBuilder.Entity<FolderCategory>()
+            .HasOne(f => f.Course)
+            .WithMany()
+            .HasForeignKey(f => f.CourseId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<FolderCategory>()
+            .HasIndex(f => f.CourseId);
+
         // Un video puede tener muchas etiquetas; se borran solas si se borra el video (no tiene
         // sentido dejar etiquetas huerfanas apuntando a un VideoId que ya no existe).
         modelBuilder.Entity<VideoMarker>()
@@ -135,6 +146,15 @@ public class AppDbContext : DbContext
         await db.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_Videos_CarpetaOrigen ON Videos (CarpetaOrigen)");
 
+        // Cursos: va ANTES de FolderCategories porque sus columnas nuevas apuntan a esta tabla.
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS Courses (
+                Id INTEGER NOT NULL CONSTRAINT PK_Courses PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL,
+                CoverImagePath TEXT NULL,
+                FechaCreado TEXT NOT NULL DEFAULT '0001-01-01 00:00:00'
+            )");
+
         var tableExists = false;
         await using (var cmd = connection.CreateCommand())
         {
@@ -152,7 +172,9 @@ public class AppDbContext : DbContext
                     DisplayName TEXT NULL,
                     Favorito INTEGER NOT NULL DEFAULT 0,
                     CategoryId INTEGER NULL,
-                    CoverImagePath TEXT NULL
+                    CoverImagePath TEXT NULL,
+                    CourseId INTEGER NULL REFERENCES Courses (Id) ON DELETE SET NULL,
+                    CourseOrder INTEGER NOT NULL DEFAULT 0
                 )");
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE UNIQUE INDEX IX_FolderCategories_FolderPath ON FolderCategories (FolderPath)");
@@ -176,7 +198,18 @@ public class AppDbContext : DbContext
 
             if (!categoryColumns.Contains("CoverImagePath"))
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE FolderCategories ADD COLUMN CoverImagePath TEXT NULL");
+
+            // SQLite admite agregar una columna con FK si su default es NULL; la cascada SET NULL
+            // queda declarada igual que si la tabla se hubiera creado con ella.
+            if (!categoryColumns.Contains("CourseId"))
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE FolderCategories ADD COLUMN CourseId INTEGER NULL REFERENCES Courses (Id) ON DELETE SET NULL");
+
+            if (!categoryColumns.Contains("CourseOrder"))
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE FolderCategories ADD COLUMN CourseOrder INTEGER NOT NULL DEFAULT 0");
         }
+
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_FolderCategories_CourseId ON FolderCategories (CourseId)");
 
         var categoriesTableExists = false;
         await using (var cmd = connection.CreateCommand())

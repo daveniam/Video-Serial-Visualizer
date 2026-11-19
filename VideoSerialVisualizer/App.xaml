@@ -156,12 +156,37 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="MenuItem">
-                            <Border Background="{TemplateBinding Background}" CornerRadius="4">
-                                <ContentPresenter ContentSource="Header" Margin="{TemplateBinding Padding}" />
-                            </Border>
+                            <Grid>
+                                <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                                    <Grid Margin="{TemplateBinding Padding}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ContentPresenter ContentSource="Header" />
+                                        <!-- Flecha de submenu (p.ej. "Mover a curso"). -->
+                                        <TextBlock x:Name="SubmenuArrow" Grid.Column="1" Text="&#8250;" Margin="16,0,0,0"
+                                                   Foreground="{StaticResource TextSecondaryBrush}" Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
+                                <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="4" AllowsTransparency="True"
+                                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                       Focusable="False" PopupAnimation="None">
+                                    <Border Background="{StaticResource BgSurfaceBrush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1" CornerRadius="8" Padding="4" MinWidth="160">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                    </Border>
+                                </Popup>
+                            </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsHighlighted" Value="True">
                                     <Setter Property="Background" Value="{StaticResource BgSurfaceAltBrush}" />
+                                </Trigger>
+                                <Trigger Property="HasItems" Value="True">
+                                    <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -338,6 +363,9 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:PlayerViewModel}">
                 <views:PlayerView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:CourseViewModel}">
+                <views:CourseView />
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>

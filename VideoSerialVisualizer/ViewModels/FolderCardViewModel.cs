@@ -37,30 +37,9 @@ public partial class FolderCardViewModel : ObservableObject
         get
         {
             var videos = $"{VideoCount}{Loc.I["Common_VideosSuffix"]}";
-            var duration = FormatDuration(TotalDurationMs);
+            var duration = DurationFormat.Total(TotalDurationMs);
             return string.IsNullOrEmpty(duration) ? videos : $"{videos}  ·  {duration}";
         }
-    }
-
-    /// <summary>Formatea una duracion total en "Xh Ymin" (o solo minutos si es menos de una hora).
-    /// Devuelve vacio si es 0.</summary>
-    private static string FormatDuration(long totalMs)
-    {
-        if (totalMs <= 0)
-            return string.Empty;
-
-        var span = TimeSpan.FromMilliseconds(totalMs);
-        var hours = (int)span.TotalHours;
-        var minutes = span.Minutes;
-
-        var h = Loc.I["Common_HoursShort"];
-        var m = Loc.I["Common_MinutesShort"];
-
-        if (hours > 0)
-            return minutes > 0 ? $"{hours}{h} {minutes}{m}" : $"{hours}{h}";
-
-        // Menos de una hora: al menos "1min" si hay algo de duracion, para no mostrar "0min".
-        return $"{Math.Max(1, minutes)}{m}";
     }
 
     [ObservableProperty]
@@ -79,6 +58,20 @@ public partial class FolderCardViewModel : ObservableObject
 
     [ObservableProperty]
     private ImageSource? thumbnailImage;
+
+    /// <summary>Curso al que pertenece (null = suelto en Explorar).</summary>
+    public int? CourseId { get; set; }
+
+    /// <summary>Posicion dentro de su curso.</summary>
+    public int CourseOrder { get; set; }
+
+    /// <summary>Numero de orden visible dentro del curso (1, 2, 3...).</summary>
+    [ObservableProperty]
+    private int position;
+
+    /// <summary>Se esta arrastrando otro grupo encima (reordenar dentro del curso): resalta el borde.</summary>
+    [ObservableProperty]
+    private bool isDropTarget;
 
     public FolderCardViewModel(string folderPath, int videoCount, long totalDurationMs, string? thumbnailPath, string? customDisplayName, bool favorito, IReadOnlyCollection<int> categoryIds, int watchedCount)
     {

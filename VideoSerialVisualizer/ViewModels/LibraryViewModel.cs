@@ -108,6 +108,9 @@ public partial class LibraryViewModel : ObservableObject
     /// </summary>
     public IReadOnlyList<Video> GetPlaylist() => Videos.Select(v => v.Video).ToList();
 
+    /// <summary>Hay una busqueda filtrando los videos (la lista visible no es el grupo entero).</summary>
+    public bool HasSearch => !string.IsNullOrWhiteSpace(SearchText);
+
     [RelayCommand]
     private void Back() => _goBack();
 

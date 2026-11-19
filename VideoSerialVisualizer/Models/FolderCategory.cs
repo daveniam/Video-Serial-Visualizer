@@ -33,4 +33,12 @@ public class FolderCategory
     public string? CoverImagePath { get; set; }
 
     public Category? Category { get; set; }
+
+    /// <summary>Curso al que pertenece el grupo (uno solo), o null si esta suelto en Explorar.</summary>
+    public int? CourseId { get; set; }
+
+    /// <summary>Posicion del grupo dentro de su curso (0, 1, 2...). Se reordena arrastrando.</summary>
+    public int CourseOrder { get; set; }
+
+    public Course? Course { get; set; }
 }

@@ -6,6 +6,7 @@ using System.IO;
 using LibVLCSharp.Shared;
 using Microsoft.EntityFrameworkCore;
 using VideoSerialVisualizer.Data;
+using VideoSerialVisualizer.Helpers;
 using VideoSerialVisualizer.Models;
 
 namespace VideoSerialVisualizer.Services;
@@ -32,12 +33,81 @@ public class FolderScannerService
         _thumbnailService = thumbnailService;
     }
 
-    public async Task<List<Video>> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null)
+    /// <summary>
+    /// Importa una carpeta armando UN GRUPO POR SUBCARPETA (lo que pide un curso ya organizado en
+    /// carpetas: "01_Intro", "02_Bases"...). Cada subcarpeta con videos (a cualquier profundidad) es
+    /// un grupo; si la carpeta elegida tiene ademas videos sueltos en su raiz, esos forman otro grupo.
+    /// Sin subcarpetas con videos, la carpeta entera es un solo grupo, como en "Agregar carpeta".
+    ///
+    /// Los videos que ya estaban cargados en otro grupo (p.ej. porque antes se agrego la carpeta
+    /// madre como un unico grupo) pasan al grupo de su subcarpeta.
+    /// </summary>
+    /// <returns>Las carpetas de los grupos resultantes, en orden natural.</returns>
+    public async Task<List<string>> ImportAsSubfolderGroupsAsync(string folderPath, IProgress<ScanProgress>? progress = null)
+    {
+        var subfolders = Directory.EnumerateDirectories(folderPath)
+            .Where(d => !IsHidden(d) && ContainsVideos(d, SearchOption.AllDirectories))
+            .OrderBy(d => d, NaturalStringComparer.Instance)
+            .ToList();
+
+        var groups = new List<(string Path, bool Recursive)>();
+        if (subfolders.Count == 0)
+        {
+            groups.Add((folderPath, true));
+        }
+        else
+        {
+            if (ContainsVideos(folderPath, SearchOption.TopDirectoryOnly))
+                groups.Add((folderPath, false));
+            groups.AddRange(subfolders.Select(s => (s, true)));
+        }
+
+        var result = new List<string>();
+        foreach (var (path, recursive) in groups)
+        {
+            await ScanFolderAsync(path, progress, recursive, claimFromOtherGroups: true);
+            result.Add(path);
+        }
+
+        return result;
+    }
+
+    private static bool ContainsVideos(string folder, SearchOption option)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(folder, "*.*", option)
+                .Any(f => VideoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()) && !IsAppleDoubleSidecar(f));
+        }
+        catch
+        {
+            return false; // sin permiso de lectura, etc.
+        }
+    }
+
+    private static bool IsHidden(string folder)
+    {
+        try
+        {
+            var name = Path.GetFileName(folder);
+            return name.StartsWith('.') || (File.GetAttributes(folder) & (FileAttributes.Hidden | FileAttributes.System)) != 0;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <param name="recursive">Incluir los videos de las subcarpetas (lo normal) o solo los de la raiz.</param>
+    /// <param name="claimFromOtherGroups">Los videos de esta carpeta que ya estaban cargados en OTRO
+    /// grupo pasan a este (ver <see cref="ImportAsSubfolderGroupsAsync"/>).</param>
+    public async Task<List<Video>> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null,
+        bool recursive = true, bool claimFromOtherGroups = false)
     {
         _libVlc ??= await _libVlcProvider();
         var addedVideos = new List<Video>();
 
-        var allFiles = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
+        var allFiles = Directory.EnumerateFiles(folderPath, "*.*", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)
             .Where(f => VideoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
             .ToList();
 
@@ -67,6 +137,21 @@ public class FolderScannerService
                 foreach (var junk in junkVideos)
                     existingByPath.Remove(junk.RutaAbsoluta);
             }
+        }
+
+        if (claimFromOtherGroups)
+        {
+            var claimed = files
+                .Where(f => existingByPath.TryGetValue(f, out var v)
+                            && !string.Equals(v.CarpetaOrigen, folderPath, StringComparison.OrdinalIgnoreCase))
+                .Select(f => existingByPath[f])
+                .ToList();
+
+            foreach (var video in claimed)
+                video.CarpetaOrigen = folderPath;
+
+            if (claimed.Count > 0)
+                await db.SaveChangesAsync();
         }
 
         var newFiles = files.Where(f => !existingByPath.ContainsKey(f)).ToList();

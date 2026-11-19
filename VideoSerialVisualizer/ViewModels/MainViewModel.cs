@@ -39,6 +39,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public FoldersViewModel? FoldersViewModel { get; private set; }
     public LibraryViewModel? LibraryViewModel { get; private set; }
     public PlayerViewModel? PlayerViewModel { get; private set; }
+    public CourseViewModel? CourseViewModel { get; private set; }
+
+    // A donde vuelve el boton "atras": la biblioteca de un grupo abierto desde un curso vuelve al
+    // curso (no a Explorar), y el reproductor lanzado con "Continuar curso" vuelve al curso.
+    private bool _libraryOpenedFromCourse;
+    private bool _playerOpenedFromCourse;
 
     public async Task InitializeAsync()
     {
@@ -76,11 +82,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var progressTracker = new ProgressTrackerService();
         var markerService = new VideoMarkerService();
 
-        FoldersViewModel = new FoldersViewModel(scannerService, OpenFolder);
-        LibraryViewModel = new LibraryViewModel(OpenPlayer, BackToFolders);
+        FoldersViewModel = new FoldersViewModel(scannerService, OpenFolder, OpenCourse);
+        LibraryViewModel = new LibraryViewModel(OpenPlayer, BackFromLibrary);
+        CourseViewModel = new CourseViewModel(scannerService, OpenGroupFromCourse, PlayFromCourse, BackToFolders);
 
         OnPropertyChanged(nameof(FoldersViewModel));
         OnPropertyChanged(nameof(LibraryViewModel));
+        OnPropertyChanged(nameof(CourseViewModel));
 
         LoadingMessage = Loc.I["Startup_Library"];
         await FoldersViewModel.InitializeAsync(); // no usa LibVLC
@@ -103,7 +111,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(PlayerViewModel));
     }
 
-    private async void OpenFolder(string folderPath)
+    private void OpenFolder(string folderPath)
+    {
+        _libraryOpenedFromCourse = false;
+        ShowLibrary(folderPath);
+    }
+
+    private void OpenGroupFromCourse(string folderPath)
+    {
+        _libraryOpenedFromCourse = true;
+        ShowLibrary(folderPath);
+    }
+
+    private async void OpenCourse(int courseId)
+    {
+        CurrentViewModel = CourseViewModel;
+        await CourseViewModel!.LoadAsync(courseId);
+    }
+
+    private async void ShowCourse()
+    {
+        CurrentViewModel = CourseViewModel;
+        await CourseViewModel!.RefreshAsync();
+    }
+
+    private void BackFromLibrary()
+    {
+        if (_libraryOpenedFromCourse)
+            ShowCourse();
+        else
+            BackToFolders();
+    }
+
+    private async void ShowLibrary(string folderPath)
     {
         var folderName = Path.GetFileName(folderPath.TrimEnd('\\', '/'));
         if (string.IsNullOrEmpty(folderName))
@@ -120,7 +160,32 @@ public partial class MainViewModel : ObservableObject, IDisposable
         await FoldersViewModel!.RefreshAsync();
     }
 
+    /// <summary>Video elegido en la biblioteca de un grupo. Si el grupo es parte de un curso (y no hay
+    /// una busqueda filtrando), la lista de reproduccion es el curso entero: al terminar el grupo
+    /// sigue con el siguiente grupo del curso.</summary>
     private async void OpenPlayer(Video video)
+    {
+        _playerOpenedFromCourse = false;
+
+        IReadOnlyList<Video> playlist = LibraryViewModel!.GetPlaylist();
+        if (_libraryOpenedFromCourse && !LibraryViewModel.HasSearch && CourseViewModel is { CourseId: > 0 } course)
+        {
+            var coursePlaylist = await GroupCatalog.GetCoursePlaylistAsync(course.CourseId);
+            if (coursePlaylist.Any(v => v.Id == video.Id))
+                playlist = coursePlaylist;
+        }
+
+        await StartPlayerAsync(video, playlist);
+    }
+
+    /// <summary>"Continuar curso": reproduce con el curso entero como lista y vuelve al curso.</summary>
+    private async void PlayFromCourse(Video video, IReadOnlyList<Video> playlist)
+    {
+        _playerOpenedFromCourse = true;
+        await StartPlayerAsync(video, playlist);
+    }
+
+    private async Task StartPlayerAsync(Video video, IReadOnlyList<Video> playlist)
     {
         // El reproductor puede no estar armado todavia si LibVLC aun se esta inicializando (arranque
         // en frio). Se espera aca; en la practica, para cuando el usuario llego hasta un video ya
@@ -135,11 +200,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Loaded) antes de reproducir, asi el primer cuadro ya tiene donde mostrarse.
         CurrentViewModel = PlayerViewModel;
         await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
-        await PlayerViewModel!.LoadVideoAsync(video, LibraryViewModel!.GetPlaylist());
+        await PlayerViewModel!.LoadVideoAsync(video, playlist);
     }
 
     private async void BackToLibrary()
     {
+        if (_playerOpenedFromCourse)
+        {
+            ShowCourse();
+            return;
+        }
+
         CurrentViewModel = LibraryViewModel;
         await LibraryViewModel!.RefreshWithSpinnerAsync();
     }

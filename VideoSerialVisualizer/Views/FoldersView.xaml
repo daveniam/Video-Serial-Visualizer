@@ -21,6 +21,13 @@
         <Grid Grid.Row="0" Margin="0,0,0,24">
             <TextBlock Text="{loc:Tr Explore_Title}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource PillButtonStyle}" Command="{Binding CreateCourseCommand}" Margin="0,0,10,0"
+                        ToolTip="{loc:Tr Course_CreateTooltip}">
+                    <Border Background="{StaticResource BgSurfaceAltBrush}" CornerRadius="8" Padding="18,10"
+                            BorderBrush="{StaticResource AccentBrush}" BorderThickness="1">
+                        <TextBlock Text="{loc:Tr Course_Create}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                    </Border>
+                </Button>
                 <Button Style="{StaticResource PillButtonStyle}" Command="{Binding AddFolderCommand}">
                     <Border Background="{StaticResource AccentBrush}" CornerRadius="8" Padding="18,10">
                         <TextBlock Text="{loc:Tr Explore_AddFolder}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
@@ -98,16 +105,85 @@
 
         <!-- Tarjetas de carpetas. VirtualizingItemsControl solo arma las tarjetas VISIBLES (y scrollea
              solo, sin ScrollViewer aparte), asi Explorar sigue fluido con cientos de grupos. -->
-        <vwp:VirtualizingItemsControl Grid.Row="3" ItemsSource="{Binding FolderCards}">
+        <vwp:VirtualizingItemsControl Grid.Row="3" ItemsSource="{Binding ExploreItems}">
                     <vwp:VirtualizingItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None" />
                         </ItemsPanelTemplate>
                     </vwp:VirtualizingItemsControl.ItemsPanel>
-                    <vwp:VirtualizingItemsControl.ItemTemplate>
+                    <vwp:VirtualizingItemsControl.Resources>
+                        <!-- Tarjeta de CURSO: mismo tamano que la de un grupo (la grilla virtualizada
+                             asume tamano uniforme), con distintivo "CURSO" y franja de acento. Recibe
+                             grupos arrastrados encima (ver FoldersView.xaml.cs). -->
+                        <DataTemplate DataType="{x:Type vm:CourseCardViewModel}">
+                            <Border Width="240" Height="190" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"
+                                    BorderThickness="2" ClipToBounds="True" AllowDrop="True"
+                                    DragEnter="Course_DragEnter" DragOver="Course_DragOver" DragLeave="Course_DragLeave" Drop="Course_Drop"
+                                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Border.ContextMenu>
+                                    <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
+                                        <MenuItem Header="{loc:Tr Course_Rename}" Style="{StaticResource DarkMenuItemStyle}"
+                                                  Command="{Binding PlacementTarget.Tag.RenameCourseCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                        <MenuItem Header="{loc:Tr Course_Delete}" Style="{StaticResource DarkMenuItemStyle}"
+                                                  Command="{Binding PlacementTarget.Tag.DeleteCourseCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="133" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Button Grid.RowSpan="2" Style="{StaticResource PlainButtonStyle}"
+                                            Command="{Binding DataContext.OpenCourseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+
+                                    <Grid Grid.Row="0" IsHitTestVisible="False">
+                                        <Rectangle Fill="{StaticResource BgSurfaceAltBrush}" />
+                                        <TextBlock Text="&#128218;" FontSize="34" Foreground="{StaticResource TextSecondaryBrush}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Image Source="{Binding ThumbnailImage}" Stretch="UniformToFill" />
+                                        <Rectangle Height="4" VerticalAlignment="Top" Fill="{StaticResource AccentBrush}" />
+                                        <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="7,2"
+                                                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8,12,0,0">
+                                            <TextBlock Text="{loc:Tr Course_Badge}" Foreground="White" FontSize="10" FontWeight="Bold" />
+                                        </Border>
+                                    </Grid>
+
+                                    <StackPanel Grid.Row="1" Margin="12,10,12,12" IsHitTestVisible="False">
+                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                        <TextBlock Text="{Binding InfoText}" Foreground="{StaticResource TextSecondaryBrush}"
+                                                   FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                        <Grid Height="4" Margin="0,8,0,0" Background="{StaticResource BgSurfaceAltBrush}"
+                                              ToolTip="{Binding WatchedTooltip}">
+                                            <Rectangle Height="4" HorizontalAlignment="Left"
+                                                       Fill="{Binding AllWatched, Converter={StaticResource CompletadoToBrushConverter}}"
+                                                       Width="{Binding WatchedPercent, Converter={StaticResource PercentToWidthConverter}, ConverterParameter=212}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+
+                        <!-- Tarjeta de GRUPO: se puede arrastrar sobre un curso para meterla en el. -->
                         <DataTemplate DataType="{x:Type vm:FolderCardViewModel}">
                             <Border Width="240" Height="190" Margin="0,0,20,20" CornerRadius="10" Background="{StaticResource BgSurfaceBrush}"
                                     BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ClipToBounds="True"
+                                    PreviewMouseLeftButtonDown="Group_PreviewMouseLeftButtonDown" PreviewMouseMove="Group_PreviewMouseMove"
+                                    ContextMenuOpening="Group_ContextMenuOpening"
                                     Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                 <Border.ContextMenu>
                                     <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
@@ -116,6 +192,11 @@
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                         <MenuItem Header="{loc:Tr Explore_AssignCategory}" Style="{StaticResource DarkMenuItemStyle}"
                                                   Command="{Binding PlacementTarget.Tag.AssignCategoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                        <!-- Se llena al abrir el menu con los cursos existentes (FoldersView.xaml.cs). -->
+                                        <MenuItem Header="{loc:Tr Course_MoveTo}" Style="{StaticResource DarkMenuItemStyle}" Tag="CourseMenu" />
+                                        <MenuItem Header="{loc:Tr Course_RemoveGroup}" Style="{StaticResource DarkMenuItemStyle}" Tag="RemoveFromCourse"
+                                                  Command="{Binding PlacementTarget.Tag.RemoveGroupFromCourseCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                         <MenuItem Header="{loc:Tr Explore_DeleteGroup}" Style="{StaticResource DarkMenuItemStyle}"
                                                   Command="{Binding PlacementTarget.Tag.DeleteFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
@@ -173,7 +254,7 @@
                                 </Grid>
                             </Border>
                         </DataTemplate>
-                    </vwp:VirtualizingItemsControl.ItemTemplate>
+                    </vwp:VirtualizingItemsControl.Resources>
         </vwp:VirtualizingItemsControl>
     </Grid>
 </UserControl>

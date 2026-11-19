@@ -22,9 +22,19 @@ public partial class FoldersViewModel : ObservableObject
 {
     private readonly FolderScannerService _scannerService;
     private readonly Action<string> _openFolder;
+    private readonly Action<int> _openCourse;
     private List<FolderCardViewModel> _allFolderCards = new();
+    private List<CourseCardViewModel> _allCourseCards = new();
 
-    public ObservableCollection<FolderCardViewModel> FolderCards { get; } = new();
+    /// <summary>
+    /// Lo que muestra la grilla de Explorar: primero las tarjetas de curso
+    /// (<see cref="CourseCardViewModel"/>) y despues los grupos sueltos
+    /// (<see cref="FolderCardViewModel"/>). Cada tipo tiene su propia plantilla en la vista.
+    /// </summary>
+    public ObservableCollection<object> ExploreItems { get; } = new();
+
+    /// <summary>Todos los cursos (para el menu "Mover a curso" de un grupo).</summary>
+    public IReadOnlyList<CourseCardViewModel> Courses => _allCourseCards;
 
     /// <summary>Categorias personalizadas creadas desde Configuración (para el filtro y el menu de asignar).</summary>
     public ObservableCollection<Category> Categories { get; } = new();
@@ -50,10 +60,119 @@ public partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private double scanProgressPercent;
 
-    public FoldersViewModel(FolderScannerService scannerService, Action<string> openFolder)
+    public FoldersViewModel(FolderScannerService scannerService, Action<string> openFolder, Action<int> openCourse)
     {
         _scannerService = scannerService;
         _openFolder = openFolder;
+        _openCourse = openCourse;
+    }
+
+    // --- Cursos ---
+
+    [RelayCommand]
+    private async Task CreateCourseAsync()
+    {
+        var name = RenameCategoryDialog.PromptForName(string.Empty, Application.Current.MainWindow, Loc.I["Course_NewTitle"]);
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        await using (var db = new AppDbContext())
+        {
+            db.Courses.Add(new Course { Name = name.Trim(), FechaCreado = DateTime.Now });
+            await db.SaveChangesAsync();
+        }
+
+        // El curso nuevo tiene que verse aunque haya un filtro puesto: se vuelve a "Todas".
+        SearchText = string.Empty;
+        OpenAll();
+        await RefreshAsync();
+    }
+
+    [RelayCommand]
+    private void OpenCourse(CourseCardViewModel? course)
+    {
+        if (course is not null)
+            _openCourse(course.Id);
+    }
+
+    [RelayCommand]
+    private async Task RenameCourseAsync(CourseCardViewModel? course)
+    {
+        if (course is null)
+            return;
+
+        var newName = RenameCategoryDialog.PromptForName(course.Name, Application.Current.MainWindow, Loc.I["Course_RenameTitle"]);
+        if (string.IsNullOrWhiteSpace(newName))
+            return;
+
+        await using var db = new AppDbContext();
+        var entry = await db.Courses.FirstOrDefaultAsync(c => c.Id == course.Id);
+        if (entry is null)
+            return;
+
+        entry.Name = newName.Trim();
+        await db.SaveChangesAsync();
+        course.Name = entry.Name;
+    }
+
+    [RelayCommand]
+    private async Task DeleteCourseAsync(CourseCardViewModel? course)
+    {
+        if (course is null)
+            return;
+
+        var confirm = MessageBox.Show(
+            string.Format(Loc.I["Course_Delete_Message"], course.Name),
+            Loc.I["Course_Delete_Title"],
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        await using (var db = new AppDbContext())
+        {
+            // La FK ya deja CourseId en NULL, pero se hace explicito por si la base vieja no la tiene.
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE FolderCategories SET CourseId = NULL, CourseOrder = 0 WHERE CourseId = {course.Id}");
+            var entry = await db.Courses.FirstOrDefaultAsync(c => c.Id == course.Id);
+            if (entry is not null)
+            {
+                db.Courses.Remove(entry);
+                await db.SaveChangesAsync();
+            }
+        }
+
+        await RefreshAsync();
+    }
+
+    /// <summary>Mete un grupo en un curso (arrastrando la tarjeta encima, o desde el menu del grupo).
+    /// Si estaba en otro curso, se muda.</summary>
+    public async Task MoveGroupToCourseAsync(FolderCardViewModel group, CourseCardViewModel course)
+    {
+        if (group.CourseId == course.Id)
+            return;
+
+        await GroupCatalog.AddGroupsToCourseAsync(course.Id, new[] { group.FolderPath });
+        await RefreshAsync();
+    }
+
+    [RelayCommand]
+    private async Task RemoveGroupFromCourseAsync(FolderCardViewModel? group)
+    {
+        if (group?.CourseId is null)
+            return;
+
+        await using (var db = new AppDbContext())
+        {
+            var entry = await db.FolderCategories.FirstOrDefaultAsync(f => f.FolderPath == group.FolderPath);
+            if (entry is null)
+                return;
+            entry.CourseId = null;
+            entry.CourseOrder = 0;
+            await db.SaveChangesAsync();
+        }
+
+        await RefreshAsync();
     }
 
     public async Task InitializeAsync() => await RefreshAsync();
@@ -331,16 +450,8 @@ public partial class FoldersViewModel : ObservableObject
         await RefreshAsync();
     }
 
-    private static async Task<FolderCategory> GetOrCreateCategoryAsync(AppDbContext db, string folderPath)
-    {
-        var entry = await db.FolderCategories.FirstOrDefaultAsync(f => f.FolderPath == folderPath);
-        if (entry is not null)
-            return entry;
-
-        entry = new FolderCategory { FolderPath = folderPath };
-        db.FolderCategories.Add(entry);
-        return entry;
-    }
+    private static Task<FolderCategory> GetOrCreateCategoryAsync(AppDbContext db, string folderPath)
+        => GroupCatalog.GetOrCreateFolderEntryAsync(db, folderPath);
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
 
@@ -366,46 +477,24 @@ public partial class FoldersViewModel : ObservableObject
     {
         await using var db = new AppDbContext();
 
-        // El conteo y la duracion total por carpeta se resuelven con GROUP BY en SQL: una fila por
-        // grupo (con COUNT y SUM), en vez de traer la tabla Videos entera a memoria.
-        var folderCounts = await db.Videos.AsNoTracking()
-            .GroupBy(v => v.CarpetaOrigen)
-            .Select(g => new { FolderPath = g.Key, Count = g.Count(), TotalMs = g.Sum(v => v.DuracionMs) })
-            .ToListAsync();
-
-        // Cuantos videos completados tiene cada carpeta, para la linea de progreso del grupo.
-        var watchedByFolder = await db.Videos.AsNoTracking()
-            .Join(db.Progress.AsNoTracking().Where(p => p.Completado), v => v.Id, p => p.VideoId, (v, p) => v.CarpetaOrigen)
-            .GroupBy(f => f)
-            .Select(g => new { FolderPath = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.FolderPath, g => g.Count);
-
-        // Para la caratula solo hacen falta los videos que TIENEN miniatura, y solo tres columnas
-        // (no la entidad completa): la eleccion del "ultimo" usa orden natural, que es logica C#.
-        var thumbnailCandidates = await db.Videos.AsNoTracking()
-            .Where(v => v.ThumbnailPath != null && v.ThumbnailPath != "")
-            .Select(v => new { v.CarpetaOrigen, v.NombreArchivo, v.ThumbnailPath })
-            .ToListAsync();
-
-        var thumbnailsByFolder = thumbnailCandidates
-            .GroupBy(v => v.CarpetaOrigen)
-            .ToDictionary(
-                g => g.Key,
-                // La caratula usa el ULTIMO video de la carpeta (orden natural): suele ser
-                // el resultado final del proceso que ensena el tutorial.
-                g => g.OrderBy(v => v.NombreArchivo, NaturalStringComparer.Instance).Last().ThumbnailPath);
-
-        var categories = await db.FolderCategories.AsNoTracking().ToDictionaryAsync(c => c.FolderPath);
+        _allFolderCards = await GroupCatalog.LoadGroupCardsAsync(db);
         var allCategories = await db.Categories.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
+        var courses = await db.Courses.AsNoTracking().OrderBy(c => c.FechaCreado).ThenBy(c => c.Id).ToListAsync();
 
-        // Categorias asignadas a cada grupo (puede haber varias). Se agrupan por carpeta para el
-        // filtro de Explorar.
-        var tagsByFolder = (await db.FolderTags.AsNoTracking().ToListAsync())
-            .GroupBy(t => t.FolderPath, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                g => g.Key,
-                g => (IReadOnlyCollection<int>)g.Select(t => t.CategoryId).ToHashSet(),
-                StringComparer.OrdinalIgnoreCase);
+        // Tarjeta de cada curso: totales sumados de sus grupos; portada elegida, o la del primer grupo.
+        var groupsByCourse = _allFolderCards
+            .Where(g => g.CourseId is not null)
+            .GroupBy(g => g.CourseId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.CourseOrder).ToList());
+
+        _allCourseCards = courses.Select(c =>
+        {
+            var groups = groupsByCourse.GetValueOrDefault(c.Id) ?? new List<FolderCardViewModel>();
+            return new CourseCardViewModel(
+                c.Id, c.Name, groups.Count,
+                groups.Sum(g => g.VideoCount), groups.Sum(g => g.WatchedCount), groups.Sum(g => g.TotalDurationMs),
+                GroupCatalog.EffectiveCover(c.CoverImagePath, groups.FirstOrDefault(g => g.ThumbnailPath is not null)?.ThumbnailPath));
+        }).ToList();
 
         Categories.Clear();
         foreach (var category in allCategories)
@@ -420,41 +509,40 @@ public partial class FoldersViewModel : ObservableObject
 
         UpdateTabSelection();
 
-        _allFolderCards = folderCounts
-            .OrderBy(g => g.FolderPath, NaturalStringComparer.Instance)
-            .Select(group =>
-            {
-                categories.TryGetValue(group.FolderPath, out var category);
-                thumbnailsByFolder.TryGetValue(group.FolderPath, out var thumbnailPath);
-                tagsByFolder.TryGetValue(group.FolderPath, out var categoryIds);
-
-                // Portada elegida a mano (clic derecho en la barra del reproductor) tiene prioridad
-                // sobre la miniatura del ultimo video. Si el archivo ya no esta, o salio negra (ver
-                // ThumbnailService.IsBlankImage), se cae al default.
-                var coverPath = category?.CoverImagePath;
-                var effectiveThumbnail = !string.IsNullOrEmpty(coverPath) && File.Exists(coverPath)
-                                         && !ThumbnailService.IsBlankImage(coverPath)
-                    ? coverPath
-                    : thumbnailPath;
-
-                return new FolderCardViewModel(
-                    group.FolderPath, group.Count, group.TotalMs, effectiveThumbnail,
-                    category?.DisplayName, category?.Favorito ?? false,
-                    categoryIds ?? Array.Empty<int>(), watchedByFolder.GetValueOrDefault(group.FolderPath));
-            })
-            .ToList();
-
+        OnPropertyChanged(nameof(Courses));
         ApplyFilter();
 
+        foreach (var course in _allCourseCards)
+            _ = course.LoadThumbnailAsync();
         foreach (var card in _allFolderCards)
             _ = card.LoadThumbnailAsync();
     }
 
+    /// <summary>
+    /// Sin filtros ("Todas" y sin busqueda) se ven los cursos y los grupos SUELTOS: los grupos de un
+    /// curso se ven entrando al curso. Con un filtro puesto (favoritos, categoria o busqueda) se buscan
+    /// en TODOS los grupos, esten o no en un curso, para que el filtro siga encontrando todo; los
+    /// cursos aparecen solo si su nombre coincide con la busqueda.
+    /// </summary>
     private void ApplyFilter()
     {
-        FolderCards.Clear();
+        ExploreItems.Clear();
 
-        IEnumerable<FolderCardViewModel> filtered = _allFolderCards;
+        var hasSearch = !string.IsNullOrWhiteSpace(SearchText);
+        var isFiltered = ShowFavoritesOnly || SelectedCategoryId is not null || hasSearch;
+
+        if (!ShowFavoritesOnly && SelectedCategoryId is null)
+        {
+            foreach (var course in _allCourseCards)
+            {
+                if (!hasSearch || course.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                    ExploreItems.Add(course);
+            }
+        }
+
+        IEnumerable<FolderCardViewModel> filtered = isFiltered
+            ? _allFolderCards
+            : _allFolderCards.Where(f => f.CourseId is null);
 
         if (ShowFavoritesOnly)
             filtered = filtered.Where(f => f.Favorito);
@@ -462,10 +550,10 @@ public partial class FoldersViewModel : ObservableObject
         if (SelectedCategoryId is int categoryId)
             filtered = filtered.Where(f => f.CategoryIds.Contains(categoryId));
 
-        if (!string.IsNullOrWhiteSpace(SearchText))
+        if (hasSearch)
             filtered = filtered.Where(f => f.DisplayName.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
 
         foreach (var card in filtered)
-            FolderCards.Add(card);
+            ExploreItems.Add(card);
     }
 }
